@@ -1,0 +1,14 @@
+=================== BEFORE run: operators
+  0 Result
+  1 Aggregate
+  2 Join
+  3 TableScan table=SAKILA.DW.DIM_CUSTOMER columns=['CUSTOMER_KEY', 'CUSTOMER_ID'] bytes=4096 pruning={'partitions_scanned': 1, 'partitions_total': 1}
+  4 JoinFilter
+  5 TableScan table=SAKILA.DW.FACT_PAYMENT columns=['CUSTOMER_KEY', 'AMOUNT'] bytes=40960 pruning={'partitions_scanned': 1, 'partitions_total': 1}
+=================== AFTER run: operators
+  0 Result
+  1 Aggregate
+  2 Join
+  3 TableScan table=SAKILA.DW.DIM_CUSTOMER columns=['CUSTOMER_KEY', 'CUSTOMER_ID'] bytes=4096 pruning={'partitions_scanned': 1, 'partitions_total': 1}
+  4 JoinFilter
+  5 TableScan table=SAKILA.DW.FACT_PAYMENT columns=['CUSTOMER_KEY', 'AMOUNT'] bytes=40960 pruning={'partitions_scanned': 1, 'partitions_total': 1}

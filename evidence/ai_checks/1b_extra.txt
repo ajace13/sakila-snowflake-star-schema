@@ -1,0 +1,11 @@
+### result sets of round 2 (12 runs: 6 swapped-order + 6 control); each must be the same four numbers
+     12 | 67406.56 | 16044    | 599              | 4.20            |
+### min and max of PAYMENT_DATE_KEY, and the filter bounds used in the BEFORE query
+| MIN_KEY  | MAX_KEY  | NULL_KEYS | ROWS_ |
+| 20050524 | 20060214 | 0         | 16044 |
+filter in the BEFORE query: BETWEEN 20050524 AND 20060214
+### medians (ms)
+round 1, fixed order (BEFORE then AFTER):  BEFORE [202, 118, 193] median 193 | AFTER [106, 73, 91] median 91
+round 2, swapped (AFTER then BEFORE):      AFTER  [90, 90, 81] median 90 | BEFORE [99, 91, 79] median 91
+control, identical text x6: [101, 100, 98, 89, 84, 80] median 93.5 min 80 max 101 spread 21
+compile_ms round 1 BEFORE [173, 100, 171] AFTER [89, 59, 73] | round 2 AFTER [71, 72, 64] BEFORE [80, 74, 64]

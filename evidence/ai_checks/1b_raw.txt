@@ -1,0 +1,121 @@
+ALTER SESSION SET USE_CACHED_RESULT = FALSE;
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+USE WAREHOUSE CLASS_WH;
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+ALTER SESSION SET QUERY_TAG = 'P4_WARMUP';
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+SELECT SUM(payment_date_key), SUM(customer_key), SUM(amount) FROM SAKILA.DW.FACT_PAYMENT;
++---------------------------------------------------------+
+| SUM(PAYMENT_DATE_KEY) | SUM(CUSTOMER_KEY) | SUM(AMOUNT) |
+|-----------------------+-------------------+-------------|
+| 321695557040          | 4767365           | 67406.56    |
++---------------------------------------------------------+
+SELECT SUM(customer_key), SUM(customer_id) FROM SAKILA.DW.DIM_CUSTOMER;
++--------------------------------------+
+| SUM(CUSTOMER_KEY) | SUM(CUSTOMER_ID) |
+|-------------------+------------------|
+| 179700            | 179700           |
++--------------------------------------+
+ALTER SESSION SET QUERY_TAG = 'P4_BEFORE';
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+SELECT SUM(p.amount) AS revenue, COUNT(*) AS payments, COUNT(DISTINCT c.customer_id) AS paying_customers, ROUND(AVG(p.amount), 2) AS average_payment FROM SAKILA.DW.FACT_PAYMENT p JOIN SAKILA.DW.DIM_CUSTOMER c ON c.customer_key = p.customer_key WHERE p.payment_date_key BETWEEN 20050524 AND 20060214;
++----------------------------------------------------------+
+| REVENUE  | PAYMENTS | PAYING_CUSTOMERS | AVERAGE_PAYMENT |
+|----------+----------+------------------+-----------------|
+| 67406.56 | 16044    | 599              | 4.20            |
++----------------------------------------------------------+
+ALTER SESSION SET QUERY_TAG = 'P4_AFTER';
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+SELECT SUM(p.amount) AS revenue, COUNT(*) AS payments, COUNT(DISTINCT c.customer_id) AS paying_customers, ROUND(AVG(p.amount), 2) AS average_payment FROM SAKILA.DW.FACT_PAYMENT p JOIN SAKILA.DW.DIM_CUSTOMER c ON c.customer_key = p.customer_key;
++----------------------------------------------------------+
+| REVENUE  | PAYMENTS | PAYING_CUSTOMERS | AVERAGE_PAYMENT |
+|----------+----------+------------------+-----------------|
+| 67406.56 | 16044    | 599              | 4.20            |
++----------------------------------------------------------+
+ALTER SESSION SET QUERY_TAG = 'P4_BEFORE';
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+SELECT SUM(p.amount) AS revenue, COUNT(*) AS payments, COUNT(DISTINCT c.customer_id) AS paying_customers, ROUND(AVG(p.amount), 2) AS average_payment FROM SAKILA.DW.FACT_PAYMENT p JOIN SAKILA.DW.DIM_CUSTOMER c ON c.customer_key = p.customer_key WHERE p.payment_date_key BETWEEN 20050524 AND 20060214;
++----------------------------------------------------------+
+| REVENUE  | PAYMENTS | PAYING_CUSTOMERS | AVERAGE_PAYMENT |
+|----------+----------+------------------+-----------------|
+| 67406.56 | 16044    | 599              | 4.20            |
++----------------------------------------------------------+
+ALTER SESSION SET QUERY_TAG = 'P4_AFTER';
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+SELECT SUM(p.amount) AS revenue, COUNT(*) AS payments, COUNT(DISTINCT c.customer_id) AS paying_customers, ROUND(AVG(p.amount), 2) AS average_payment FROM SAKILA.DW.FACT_PAYMENT p JOIN SAKILA.DW.DIM_CUSTOMER c ON c.customer_key = p.customer_key;
++----------------------------------------------------------+
+| REVENUE  | PAYMENTS | PAYING_CUSTOMERS | AVERAGE_PAYMENT |
+|----------+----------+------------------+-----------------|
+| 67406.56 | 16044    | 599              | 4.20            |
++----------------------------------------------------------+
+ALTER SESSION SET QUERY_TAG = 'P4_BEFORE';
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+SELECT SUM(p.amount) AS revenue, COUNT(*) AS payments, COUNT(DISTINCT c.customer_id) AS paying_customers, ROUND(AVG(p.amount), 2) AS average_payment FROM SAKILA.DW.FACT_PAYMENT p JOIN SAKILA.DW.DIM_CUSTOMER c ON c.customer_key = p.customer_key WHERE p.payment_date_key BETWEEN 20050524 AND 20060214;
++----------------------------------------------------------+
+| REVENUE  | PAYMENTS | PAYING_CUSTOMERS | AVERAGE_PAYMENT |
+|----------+----------+------------------+-----------------|
+| 67406.56 | 16044    | 599              | 4.20            |
++----------------------------------------------------------+
+ALTER SESSION SET QUERY_TAG = 'P4_AFTER';
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+SELECT SUM(p.amount) AS revenue, COUNT(*) AS payments, COUNT(DISTINCT c.customer_id) AS paying_customers, ROUND(AVG(p.amount), 2) AS average_payment FROM SAKILA.DW.FACT_PAYMENT p JOIN SAKILA.DW.DIM_CUSTOMER c ON c.customer_key = p.customer_key;
++----------------------------------------------------------+
+| REVENUE  | PAYMENTS | PAYING_CUSTOMERS | AVERAGE_PAYMENT |
+|----------+----------+------------------+-----------------|
+| 67406.56 | 16044    | 599              | 4.20            |
++----------------------------------------------------------+
+ALTER SESSION SET QUERY_TAG = '';
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+SELECT TO_CHAR(start_time, 'HH24:MI:SS.FF3') AS started, query_tag, query_id, total_elapsed_time AS elapsed_ms, compilation_time AS compile_ms, execution_time AS exec_ms, queued_provisioning_time AS provisioning_ms, bytes_scanned, rows_produced FROM TABLE(INFORMATION_SCHEMA.QUERY_HISTORY_BY_SESSION(RESULT_LIMIT => 100)) WHERE query_tag IN ('P4_WARMUP', 'P4_BEFORE', 'P4_AFTER') AND query_type = 'SELECT' ORDER BY start_time
++-------------------------------------------------------------------------------------------------------------------------------------------------------+
+| STARTED      | QUERY_TAG | QUERY_ID                             | ELAPSED_MS | COMPILE_MS | EXEC_MS | PROVISIONING_MS | BYTES_SCANNED | ROWS_PRODUCED |
+|--------------+-----------+--------------------------------------+------------+------------+---------+-----------------+---------------+---------------|
+| 17:39:07.676 | P4_WARMUP | 01c7fa27-0303-aef6-001f-81630005da92 | 655        | 295        | 252     | 108             | 174080        | 1             |
+| 17:39:08.387 | P4_WARMUP | 01c7fa27-0303-aed4-001f-81630006a196 | 202        | 140        | 62      | 0               | 65536         | 1             |
+| 17:39:08.783 | P4_BEFORE | 01c7fa27-0303-aefc-001f-81630005ea9e | 202        | 173        | 29      | 0               | 239616        | 1             |
+| 17:39:09.157 | P4_AFTER  | 01c7fa27-0303-aef6-001f-81630005da96 | 106        | 89         | 17      | 0               | 239616        | 1             |
+| 17:39:09.400 | P4_BEFORE | 01c7fa27-0303-aed4-001f-81630006a19e | 118        | 100        | 18      | 0               | 239616        | 1             |
+| 17:39:09.679 | P4_AFTER  | 01c7fa27-0303-aef6-001f-81630005da9a | 73         | 59         | 14      | 0               | 239616        | 1             |
+| 17:39:09.936 | P4_BEFORE | 01c7fa27-0303-b08d-001f-816300068612 | 193        | 171        | 22      | 0               | 239616        | 1             |
+| 17:39:10.270 | P4_AFTER  | 01c7fa27-0303-aed4-001f-81630006a1ae | 91         | 73         | 18      | 0               | 239616        | 1             |
++-------------------------------------------------------------------------------------------------------------------------------------------------------+

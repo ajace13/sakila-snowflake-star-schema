@@ -1,0 +1,26 @@
+### E1 explainer's own proposed query, run exactly as it wrote it (claim 4)
+| CUSTOMER_STORE | STAFF_STORE | INVENTORY_STORE | PAYMENTS | REVENUE |
+| 1              | 1           | 1               | 2165     | 9114.36 |
+| 1              | 1           | 2               | 2238     | 9318.62 |
+| 1              | 2           | 1               | 2161     | 9434.38 |
+| 1              | 2           | 2               | 2183     | 9130.17 |
+| 2              | 1           | 1               | 1820     | 7487.84 |
+| 2              | 1           | 2               | 1831     | 7561.68 |
+| 2              | 2           | 1               | 1777     | 7643.21 |
+| 2              | 2           | 2               | 1869     | 7716.30 |
+### E2 totals of A and B (claim 3)
+| QUERY                             | PAYMENTS | REVENUE  |
+| A normalized, customer home store | 16044    | 67406.56 |
+| B star, DIM_STORE via store_key   | 16044    | 67406.56 |
+| payment (the grain)               | 16044    | 67406.56 |
+### E3 what the star's store_key is documented to mean (claim 1: 'can't tell from the text')
+| TABLE_NAME   | COLUMN_NAME | COMMENT                          |
+| FACT_PAYMENT | STORE_KEY   | store that holds the rented copy |
+### E4 the star asked with the customer's home store (claim 5: B would equal A)
+| STORE_ID | PAYMENTS | REVENUE  |
+| 1        | 8747     | 36997.53 |
+| 2        | 7297     | 30409.03 |
+### E5 the staff-store definition (claim 2: 'the store that took the payment')
+| STORE_ID | PAYMENTS | REVENUE  |
+| 1        | 8054     | 33482.50 |
+| 2        | 7990     | 33924.06 |

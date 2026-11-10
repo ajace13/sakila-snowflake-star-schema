@@ -1,0 +1,30 @@
+### CLAIM 1 (dictionary Summary table and Q4): columns 19/10/17/8/9/9/12 and NOT NULL 6/1/6/3/3/9/10, in table-name order
+| TABLE_NAME   | N_COLUMNS | N_NOT_NULL |
+| DIM_CUSTOMER | 19        | 6          |
+| DIM_DATE     | 10        | 1          |
+| DIM_FILM     | 17        | 6          |
+| DIM_STAFF    | 8         | 3          |
+| DIM_STORE    | 9         | 3          |
+| FACT_PAYMENT | 9         | 9          |
+| FACT_RENTAL  | 12        | 10         |
+| TOTAL_COLUMNS |
+| 84            |
+### CLAIM 2 (Constraints by table, Q3): 7 primary key, 4 unique, 11 foreign key = 22, all ENFORCED = NO; FACT_RENTAL 6 FK, FACT_PAYMENT 5 FK
+| TABLE_NAME   | PK | UQ | FK | TOTAL | NOT_ENFORCED |
+| DIM_CUSTOMER | 1  | 1  | 0  | 2     | 2            |
+| DIM_DATE     | 1  | 0  | 0  | 1     | 1            |
+| DIM_FILM     | 1  | 1  | 0  | 2     | 2            |
+| DIM_STAFF    | 1  | 1  | 0  | 2     | 2            |
+| DIM_STORE    | 1  | 1  | 0  | 2     | 2            |
+| FACT_PAYMENT | 1  | 0  | 5  | 6     | 6            |
+| FACT_RENTAL  | 1  | 0  | 6  | 7     | 7            |
+| PK | UQ | FK | TOTAL | NOT_ENFORCED |
+| 7  | 4  | 11 | 22    | 22           |
+### CLAIM 3 (Q2): the identity columns are exactly CUSTOMER_KEY, FILM_KEY, STAFF_KEY, STORE_KEY; COLUMN_DEFAULT is NULL for every column
+| TABLE_NAME   | COLUMN_NAME  | IS_IDENTITY |
+| DIM_CUSTOMER | CUSTOMER_KEY | YES         |
+| DIM_FILM     | FILM_KEY     | YES         |
+| DIM_STAFF    | STAFF_KEY    | YES         |
+| DIM_STORE    | STORE_KEY    | YES         |
+| COLUMNS_ | IDENTITY_COLUMNS | COLUMNS_WITH_A_DEFAULT |
+| 84       | 4                | 0                      |

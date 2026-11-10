@@ -1,0 +1,392 @@
+USE ROLE SYSADMIN;
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+USE WAREHOUSE CLASS_WH;
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+SELECT 'Q1 revenue by month' AS question, COALESCE(o.month, s.month) AS month, o.revenue AS normalized_revenue, s.revenue AS star_revenue,
+       IFF(o.revenue = s.revenue, 'AGREE', 'DISAGREE') AS result
+FROM (SELECT TO_CHAR(payment_date, 'YYYY-MM') AS month, SUM(amount) AS revenue FROM SAKILA.OLTP.payment GROUP BY 1) o
+FULL JOIN (SELECT TO_CHAR(d.full_date, 'YYYY-MM') AS month, SUM(p.amount) AS revenue
+           FROM SAKILA.DW.FACT_PAYMENT p JOIN SAKILA.DW.DIM_DATE d ON d.date_key = p.payment_date_key GROUP BY 1) s ON s.month = o.month
+ORDER BY 2;
++----------------------------------------------------------------------------+
+| QUESTION            | MONTH   | NORMALIZED_REVENUE | STAR_REVENUE | RESULT |
+|---------------------+---------+--------------------+--------------+--------|
+| Q1 revenue by month | 2005-05 | 4823.44            | 4823.44      | AGREE  |
+| Q1 revenue by month | 2005-06 | 9629.89            | 9629.89      | AGREE  |
+| Q1 revenue by month | 2005-07 | 28368.91           | 28368.91     | AGREE  |
+| Q1 revenue by month | 2005-08 | 24070.14           | 24070.14     | AGREE  |
+| Q1 revenue by month | 2006-02 | 514.18             | 514.18       | AGREE  |
++----------------------------------------------------------------------------+
+SELECT 'Q2 top categories' AS question, COALESCE(o.category, s.category) AS category,
+       o.revenue AS normalized_revenue, s.revenue AS star_revenue, o.rentals AS normalized_rentals, s.rentals AS star_rentals,
+       o.rnk AS normalized_rank, s.rnk AS star_rank,
+       IFF(o.revenue = s.revenue AND o.rentals = s.rentals AND o.rnk = s.rnk, 'AGREE', 'DISAGREE') AS result
+FROM (SELECT cat.name AS category, SUM(p.amount) AS revenue, COUNT(*) AS rentals, RANK() OVER (ORDER BY SUM(p.amount) DESC) AS rnk
+      FROM SAKILA.OLTP.payment p JOIN SAKILA.OLTP.rental r ON r.rental_id = p.rental_id
+      JOIN SAKILA.OLTP.inventory i ON i.inventory_id = r.inventory_id
+      JOIN SAKILA.OLTP.film_category fc ON fc.film_id = i.film_id JOIN SAKILA.OLTP.category cat ON cat.category_id = fc.category_id GROUP BY 1) o
+FULL JOIN (SELECT f.category, SUM(p.amount) AS revenue, COUNT(*) AS rentals, RANK() OVER (ORDER BY SUM(p.amount) DESC) AS rnk
+           FROM SAKILA.DW.FACT_PAYMENT p JOIN SAKILA.DW.DIM_FILM f ON f.film_key = p.film_key GROUP BY 1) s ON s.category = o.category
+ORDER BY COALESCE(o.rnk, s.rnk) LIMIT 5;
++----------------------------------------------------------------------------------------------------------------------------------------------+
+| QUESTION          | CATEGORY  | NORMALIZED_REVENUE | STAR_REVENUE | NORMALIZED_RENTALS | STAR_RENTALS | NORMALIZED_RANK | STAR_RANK | RESULT |
+|-------------------+-----------+--------------------+--------------+--------------------+--------------+-----------------+-----------+--------|
+| Q2 top categories | Sports    | 5314.21            | 5314.21      | 1179               | 1179         | 1               | 1         | AGREE  |
+| Q2 top categories | Sci-Fi    | 4756.98            | 4756.98      | 1101               | 1101         | 2               | 2         | AGREE  |
+| Q2 top categories | Animation | 4656.30            | 4656.30      | 1166               | 1166         | 3               | 3         | AGREE  |
+| Q2 top categories | Drama     | 4587.39            | 4587.39      | 1060               | 1060         | 4               | 4         | AGREE  |
+| Q2 top categories | Comedy    | 4383.58            | 4383.58      | 941                | 941          | 5               | 5         | AGREE  |
++----------------------------------------------------------------------------------------------------------------------------------------------+
+SELECT 'Q3a customers by home store' AS question, COALESCE(o.store_id, s.store_id) AS store_id, o.customers AS normalized, s.customers AS star,
+       IFF(o.customers = s.customers, 'AGREE', 'DISAGREE') AS result
+FROM (SELECT store_id, COUNT(*) AS customers FROM SAKILA.OLTP.customer GROUP BY 1) o
+FULL JOIN (SELECT store_id, COUNT(DISTINCT customer_id) AS customers FROM SAKILA.DW.DIM_CUSTOMER WHERE is_current GROUP BY 1) s ON s.store_id = o.store_id
+ORDER BY 2;
++---------------------------------------------------------------------+
+| QUESTION                    | STORE_ID | NORMALIZED | STAR | RESULT |
+|-----------------------------+----------+------------+------+--------|
+| Q3a customers by home store | 1        | 326        | 326  | AGREE  |
+| Q3a customers by home store | 2        | 273        | 273  | AGREE  |
++---------------------------------------------------------------------+
+SELECT 'Q3b revenue by store, three definitions' AS question, COALESCE(o.definition, s.definition) AS definition, COALESCE(o.store_id, s.store_id) AS store_id,
+       o.revenue AS normalized_revenue, s.revenue AS star_revenue, IFF(o.revenue = s.revenue, 'AGREE', 'DISAGREE') AS result
+FROM (SELECT '1 customer home store' AS definition, c.store_id, SUM(p.amount) AS revenue FROM SAKILA.OLTP.payment p JOIN SAKILA.OLTP.customer c ON c.customer_id = p.customer_id GROUP BY 2
+      UNION ALL SELECT '2 store of the staff member who took the payment', st.store_id, SUM(p.amount) FROM SAKILA.OLTP.payment p JOIN SAKILA.OLTP.staff st ON st.staff_id = p.staff_id GROUP BY 2
+      UNION ALL SELECT '3 store holding the rented copy', i.store_id, SUM(p.amount) FROM SAKILA.OLTP.payment p JOIN SAKILA.OLTP.rental r ON r.rental_id = p.rental_id
+                JOIN SAKILA.OLTP.inventory i ON i.inventory_id = r.inventory_id GROUP BY 2) o
+FULL JOIN (SELECT '1 customer home store' AS definition, c.store_id, SUM(p.amount) AS revenue FROM SAKILA.DW.FACT_PAYMENT p JOIN SAKILA.DW.DIM_CUSTOMER c ON c.customer_key = p.customer_key GROUP BY 2
+           UNION ALL SELECT '2 store of the staff member who took the payment', sf.home_store_id, SUM(p.amount) FROM SAKILA.DW.FACT_PAYMENT p JOIN SAKILA.DW.DIM_STAFF sf ON sf.staff_key = p.staff_key GROUP BY 2
+           UNION ALL SELECT '3 store holding the rented copy', st.store_id, SUM(p.amount) FROM SAKILA.DW.FACT_PAYMENT p JOIN SAKILA.DW.DIM_STORE st ON st.store_key = p.store_key GROUP BY 2) s
+  ON s.definition = o.definition AND s.store_id = o.store_id
+ORDER BY 2, 3;
++----------------------------------------------------------------------------------------------------------------------------------------------------+
+| QUESTION                                | DEFINITION                                       | STORE_ID | NORMALIZED_REVENUE | STAR_REVENUE | RESULT |
+|-----------------------------------------+--------------------------------------------------+----------+--------------------+--------------+--------|
+| Q3b revenue by store, three definitions | 1 customer home store                            | 1        | 36997.53           | 36997.53     | AGREE  |
+| Q3b revenue by store, three definitions | 1 customer home store                            | 2        | 30409.03           | 30409.03     | AGREE  |
+| Q3b revenue by store, three definitions | 2 store of the staff member who took the payment | 1        | 33482.50           | 33482.50     | AGREE  |
+| Q3b revenue by store, three definitions | 2 store of the staff member who took the payment | 2        | 33924.06           | 33924.06     | AGREE  |
+| Q3b revenue by store, three definitions | 3 store holding the rented copy                  | 1        | 33679.79           | 33679.79     | AGREE  |
+| Q3b revenue by store, three definitions | 3 store holding the rented copy                  | 2        | 33726.77           | 33726.77     | AGREE  |
++----------------------------------------------------------------------------------------------------------------------------------------------------+
+BEGIN;
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+SELECT '3.2 BEFORE the change' AS step, (SELECT COUNT(*) FROM SAKILA.DW.DIM_CUSTOMER) AS dim_customer_rows, (SELECT COUNT(*) FROM SAKILA.DW.DIM_FILM) AS dim_film_rows;
++-----------------------------------------------------------+
+| STEP                  | DIM_CUSTOMER_ROWS | DIM_FILM_ROWS |
+|-----------------------+-------------------+---------------|
+| 3.2 BEFORE the change | 599               | 1000          |
++-----------------------------------------------------------+
+UPDATE SAKILA.OLTP.address SET address = '1 Calle Nueva', city_id = 1
+  WHERE address_id = (SELECT address_id FROM SAKILA.OLTP.customer WHERE customer_id = 1);
++--------------------------------------------------------------+
+| number of rows updated | number of multi-joined rows updated |
+|------------------------+-------------------------------------|
+| 1                      | 0                                   |
++--------------------------------------------------------------+
+UPDATE SAKILA.OLTP.film SET rental_rate = 5.99 WHERE film_id = 1;
++--------------------------------------------------------------+
+| number of rows updated | number of multi-joined rows updated |
+|------------------------+-------------------------------------|
+| 1                      | 0                                   |
++--------------------------------------------------------------+
+USE ROLE SYSADMIN;
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+USE WAREHOUSE CLASS_WH;
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+USE SCHEMA SAKILA.DW;
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+SET etl_as_of = (SELECT CURRENT_TIMESTAMP()::TIMESTAMP_NTZ(0));
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+MERGE INTO DIM_DATE t USING (
+  SELECT TO_NUMBER(TO_CHAR(d, 'YYYYMMDD')) AS date_key, d AS full_date, YEAR(d) AS year, QUARTER(d) AS quarter, MONTH(d) AS month,
+         MONTHNAME(d) AS month_name, DAY(d) AS day_of_month, DAYOFWEEKISO(d) AS day_of_week, DAYNAME(d) AS day_name,
+         DAYOFWEEKISO(d) >= 6 AS is_weekend
+  FROM (SELECT DATEADD(day, SEQ4(), '2005-01-01'::DATE) AS d FROM TABLE(GENERATOR(ROWCOUNT => 9496)))
+  UNION ALL
+  SELECT -1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL        
+) s ON t.date_key = s.date_key
+WHEN NOT MATCHED THEN INSERT (date_key, full_date, year, quarter, month, month_name, day_of_month, day_of_week, day_name, is_weekend)
+  VALUES (s.date_key, s.full_date, s.year, s.quarter, s.month, s.month_name, s.day_of_month, s.day_of_week, s.day_name, s.is_weekend);
++-------------------------+
+| number of rows inserted |
+|-------------------------|
+| 0                       |
++-------------------------+
+MERGE INTO DIM_STORE t USING (
+  SELECT s.store_id, m.first_name || ' ' || m.last_name AS manager_name, a.address, a.district, a.postal_code, ci.city, co.country,
+         MD5(TO_JSON(ARRAY_CONSTRUCT(m.first_name, m.last_name, a.address, a.district, a.postal_code, ci.city, co.country))) AS row_hash
+  FROM SAKILA.OLTP.store s
+  JOIN SAKILA.OLTP.staff m ON m.staff_id = s.manager_staff_id
+  JOIN SAKILA.OLTP.address a ON a.address_id = s.address_id
+  JOIN SAKILA.OLTP.city ci ON ci.city_id = a.city_id
+  JOIN SAKILA.OLTP.country co ON co.country_id = ci.country_id
+) src ON t.store_id = src.store_id
+WHEN MATCHED AND t.row_hash <> src.row_hash THEN UPDATE SET
+  manager_name = src.manager_name, address = src.address, district = src.district, postal_code = src.postal_code,
+  city = src.city, country = src.country, row_hash = src.row_hash
+WHEN NOT MATCHED THEN INSERT (store_id, manager_name, address, district, postal_code, city, country, row_hash)
+  VALUES (src.store_id, src.manager_name, src.address, src.district, src.postal_code, src.city, src.country, src.row_hash);
++--------------------------------------------------+
+| number of rows inserted | number of rows updated |
+|-------------------------+------------------------|
+| 0                       | 0                      |
++--------------------------------------------------+
+MERGE INTO DIM_STAFF t USING (
+  SELECT staff_id, first_name || ' ' || last_name AS staff_name, email, username, store_id AS home_store_id, active,
+         MD5(TO_JSON(ARRAY_CONSTRUCT(first_name, last_name, email, username, store_id, active))) AS row_hash
+  FROM SAKILA.OLTP.staff
+) src ON t.staff_id = src.staff_id
+WHEN MATCHED AND t.row_hash <> src.row_hash THEN UPDATE SET
+  staff_name = src.staff_name, email = src.email, username = src.username, home_store_id = src.home_store_id,
+  active = src.active, row_hash = src.row_hash
+WHEN NOT MATCHED THEN INSERT (staff_id, staff_name, email, username, home_store_id, active, row_hash)
+  VALUES (src.staff_id, src.staff_name, src.email, src.username, src.home_store_id, src.active, src.row_hash);
++--------------------------------------------------+
+| number of rows inserted | number of rows updated |
+|-------------------------+------------------------|
+| 0                       | 0                      |
++--------------------------------------------------+
+MERGE INTO DIM_CUSTOMER t USING (
+  WITH src AS (
+    SELECT c.customer_id, c.first_name, c.last_name, c.email, c.active, c.store_id, c.create_date,
+           a.address, a.address2, a.district, a.postal_code, a.phone, ci.city, co.country,
+           MD5(TO_JSON(ARRAY_CONSTRUCT(c.first_name, c.last_name, c.email, c.active, c.store_id, c.create_date,
+                                       a.address, a.address2, a.district, a.postal_code, a.phone, ci.city, co.country))) AS row_hash
+    FROM SAKILA.OLTP.customer c
+    JOIN SAKILA.OLTP.address a ON a.address_id = c.address_id
+    JOIN SAKILA.OLTP.city ci ON ci.city_id = a.city_id
+    JOIN SAKILA.OLTP.country co ON co.country_id = ci.country_id
+  )
+  SELECT s.customer_id AS merge_key, FALSE AS is_new_version, s.* FROM src s
+  UNION ALL
+  SELECT NULL, TRUE, s.* FROM src s
+  JOIN DIM_CUSTOMER d ON d.customer_id = s.customer_id AND d.is_current AND d.row_hash <> s.row_hash
+) u ON t.customer_id = u.merge_key AND t.is_current
+WHEN MATCHED AND t.row_hash <> u.row_hash THEN UPDATE SET valid_to = $etl_as_of, is_current = FALSE
+WHEN NOT MATCHED THEN INSERT (customer_id, first_name, last_name, email, active, store_id, create_date, address, address2, district,
+                              postal_code, phone, city, country, row_hash, valid_from, valid_to, is_current)
+  VALUES (u.customer_id, u.first_name, u.last_name, u.email, u.active, u.store_id, u.create_date, u.address, u.address2, u.district,
+          u.postal_code, u.phone, u.city, u.country, u.row_hash,
+          IFF(u.is_new_version, $etl_as_of, '1900-01-01'::TIMESTAMP_NTZ(0)), '9999-12-31'::TIMESTAMP_NTZ(0), TRUE);
++--------------------------------------------------+
+| number of rows inserted | number of rows updated |
+|-------------------------+------------------------|
+| 1                       | 1                      |
++--------------------------------------------------+
+MERGE INTO DIM_FILM t USING (
+  WITH src AS (
+    SELECT f.film_id, f.title, f.release_year, l.name AS language, ol.name AS original_language, cat.name AS category,
+           f.rating, f.special_features, f.length, f.rental_duration, f.rental_rate, f.replacement_cost,
+           MD5(TO_JSON(ARRAY_CONSTRUCT(f.title, f.release_year, l.name, ol.name, cat.name, f.rating, f.special_features, f.length,
+                                       f.rental_duration, f.rental_rate, f.replacement_cost))) AS row_hash
+    FROM SAKILA.OLTP.film f
+    JOIN SAKILA.OLTP.language l ON l.language_id = f.language_id
+    LEFT JOIN SAKILA.OLTP.language ol ON ol.language_id = f.original_language_id
+    JOIN SAKILA.OLTP.film_category fc ON fc.film_id = f.film_id
+    JOIN SAKILA.OLTP.category cat ON cat.category_id = fc.category_id
+  )
+  SELECT s.film_id AS merge_key, FALSE AS is_new_version, s.* FROM src s
+  UNION ALL
+  SELECT NULL, TRUE, s.* FROM src s
+  JOIN DIM_FILM d ON d.film_id = s.film_id AND d.is_current AND d.row_hash <> s.row_hash
+) u ON t.film_id = u.merge_key AND t.is_current
+WHEN MATCHED AND t.row_hash <> u.row_hash THEN UPDATE SET valid_to = $etl_as_of, is_current = FALSE
+WHEN NOT MATCHED THEN INSERT (film_id, title, release_year, language, original_language, category, rating, special_features, length,
+                              rental_duration, rental_rate, replacement_cost, row_hash, valid_from, valid_to, is_current)
+  VALUES (u.film_id, u.title, u.release_year, u.language, u.original_language, u.category, u.rating, u.special_features, u.length,
+          u.rental_duration, u.rental_rate, u.replacement_cost, u.row_hash,
+          IFF(u.is_new_version, $etl_as_of, '1900-01-01'::TIMESTAMP_NTZ(0)), '9999-12-31'::TIMESTAMP_NTZ(0), TRUE);
++--------------------------------------------------+
+| number of rows inserted | number of rows updated |
+|-------------------------+------------------------|
+| 1                       | 1                      |
++--------------------------------------------------+
+MERGE INTO FACT_RENTAL t USING (
+  SELECT r.rental_id, r.inventory_id,
+         TO_NUMBER(TO_CHAR(r.rental_date, 'YYYYMMDD')) AS rental_date_key,
+         IFF(r.return_date IS NULL, -1, TO_NUMBER(TO_CHAR(r.return_date, 'YYYYMMDD'))) AS return_date_key,
+         c.customer_key, f.film_key, st.store_key, sf.staff_key,
+         r.rental_date AS rental_ts, r.return_date AS return_ts, 1 AS rental_count,
+         DATEDIFF('day', r.rental_date, r.return_date) AS days_out
+  FROM SAKILA.OLTP.rental r
+  JOIN SAKILA.OLTP.inventory i ON i.inventory_id = r.inventory_id
+  LEFT JOIN DIM_CUSTOMER c ON c.customer_id = r.customer_id AND r.rental_date >= c.valid_from AND r.rental_date < c.valid_to
+  LEFT JOIN DIM_FILM f ON f.film_id = i.film_id AND r.rental_date >= f.valid_from AND r.rental_date < f.valid_to
+  LEFT JOIN DIM_STORE st ON st.store_id = i.store_id
+  LEFT JOIN DIM_STAFF sf ON sf.staff_id = r.staff_id
+) s ON t.rental_id = s.rental_id
+WHEN MATCHED AND (t.return_ts IS DISTINCT FROM s.return_ts OR t.days_out IS DISTINCT FROM s.days_out) THEN UPDATE SET
+  return_date_key = s.return_date_key, return_ts = s.return_ts, days_out = s.days_out
+WHEN NOT MATCHED THEN INSERT (rental_id, inventory_id, rental_date_key, return_date_key, customer_key, film_key, store_key, staff_key,
+                              rental_ts, return_ts, rental_count, days_out)
+  VALUES (s.rental_id, s.inventory_id, s.rental_date_key, s.return_date_key, s.customer_key, s.film_key, s.store_key, s.staff_key,
+          s.rental_ts, s.return_ts, s.rental_count, s.days_out);
++--------------------------------------------------+
+| number of rows inserted | number of rows updated |
+|-------------------------+------------------------|
+| 0                       | 0                      |
++--------------------------------------------------+
+MERGE INTO FACT_PAYMENT t USING (
+  SELECT p.payment_id, p.rental_id, TO_NUMBER(TO_CHAR(p.payment_date, 'YYYYMMDD')) AS payment_date_key,
+         c.customer_key, f.film_key, st.store_key, sf.staff_key, p.payment_date AS payment_ts, p.amount
+  FROM SAKILA.OLTP.payment p
+  LEFT JOIN SAKILA.OLTP.rental r ON r.rental_id = p.rental_id
+  LEFT JOIN SAKILA.OLTP.inventory i ON i.inventory_id = r.inventory_id
+  LEFT JOIN DIM_CUSTOMER c ON c.customer_id = p.customer_id AND p.payment_date >= c.valid_from AND p.payment_date < c.valid_to
+  LEFT JOIN DIM_FILM f ON f.film_id = i.film_id AND r.rental_date >= f.valid_from AND r.rental_date < f.valid_to
+  LEFT JOIN DIM_STORE st ON st.store_id = i.store_id
+  LEFT JOIN DIM_STAFF sf ON sf.staff_id = p.staff_id
+) s ON t.payment_id = s.payment_id
+WHEN MATCHED AND t.amount <> s.amount THEN UPDATE SET amount = s.amount
+WHEN NOT MATCHED THEN INSERT (payment_id, rental_id, payment_date_key, customer_key, film_key, store_key, staff_key, payment_ts, amount)
+  VALUES (s.payment_id, s.rental_id, s.payment_date_key, s.customer_key, s.film_key, s.store_key, s.staff_key, s.payment_ts, s.amount);
++--------------------------------------------------+
+| number of rows inserted | number of rows updated |
+|-------------------------+------------------------|
+| 0                       | 0                      |
++--------------------------------------------------+
+SELECT '3.2 DIM_CUSTOMER customer 1' AS step, customer_key, country, city, address, valid_from, valid_to, is_current FROM SAKILA.DW.DIM_CUSTOMER WHERE customer_id = 1 ORDER BY valid_from;
++-------------------------------------------------------------------------------------------------------------------------------------------------------+
+| STEP                        | CUSTOMER_KEY | COUNTRY | CITY                 | ADDRESS        | VALID_FROM          | VALID_TO            | IS_CURRENT |
+|-----------------------------+--------------+---------+----------------------+----------------+---------------------+---------------------+------------|
+| 3.2 DIM_CUSTOMER customer 1 | 1            | Japan   | Sasebo               | 1913 Hanoi Way | 1900-01-01 00:00:00 | 2026-10-25 14:06:40 | False      |
+| 3.2 DIM_CUSTOMER customer 1 | 7801         | Spain   | A Coruña (La Coruña) | 1 Calle Nueva  | 2026-10-25 14:06:40 | 9999-12-31 00:00:00 | True       |
++-------------------------------------------------------------------------------------------------------------------------------------------------------+
+SELECT '3.2 DIM_FILM film 1' AS step, film_key, rental_rate, valid_from, valid_to, is_current FROM SAKILA.DW.DIM_FILM WHERE film_id = 1 ORDER BY valid_from;
++-------------------------------------------------------------------------------------------------------+
+| STEP                | FILM_KEY | RENTAL_RATE | VALID_FROM          | VALID_TO            | IS_CURRENT |
+|---------------------+----------+-------------+---------------------+---------------------+------------|
+| 3.2 DIM_FILM film 1 | 1        | 0.99        | 1900-01-01 00:00:00 | 2026-10-25 14:06:40 | False      |
+| 3.2 DIM_FILM film 1 | 12501    | 5.99        | 2026-10-25 14:06:40 | 9999-12-31 00:00:00 | True       |
++-------------------------------------------------------------------------------------------------------+
+SELECT '3.2 revenue by customer country: groups where the models differ' AS step, COALESCE(o.country, s.country) AS country,
+       o.revenue AS normalized_revenue, s.revenue AS star_revenue, COALESCE(s.revenue, 0) - COALESCE(o.revenue, 0) AS star_minus_normalized
+FROM (SELECT co.country, SUM(p.amount) AS revenue FROM SAKILA.OLTP.payment p JOIN SAKILA.OLTP.customer cu ON cu.customer_id = p.customer_id
+      JOIN SAKILA.OLTP.address a ON a.address_id = cu.address_id JOIN SAKILA.OLTP.city ci ON ci.city_id = a.city_id
+      JOIN SAKILA.OLTP.country co ON co.country_id = ci.country_id GROUP BY 1) o
+FULL JOIN (SELECT c.country, SUM(p.amount) AS revenue FROM SAKILA.DW.FACT_PAYMENT p JOIN SAKILA.DW.DIM_CUSTOMER c ON c.customer_key = p.customer_key GROUP BY 1) s ON s.country = o.country
+WHERE o.revenue IS DISTINCT FROM s.revenue ORDER BY 2;
++---------------------------------------------------------------------------------------------------------------------------------------+
+| STEP                                                            | COUNTRY | NORMALIZED_REVENUE | STAR_REVENUE | STAR_MINUS_NORMALIZED |
+|-----------------------------------------------------------------+---------+--------------------+--------------+-----------------------|
+| 3.2 revenue by customer country: groups where the models differ | Japan   | 3352.07            | 3470.75      | 118.68                |
+| 3.2 revenue by customer country: groups where the models differ | Spain   | 725.26             | 606.58       | -118.68               |
++---------------------------------------------------------------------------------------------------------------------------------------+
+SELECT '3.2 total revenue' AS step, (SELECT SUM(amount) FROM SAKILA.OLTP.payment) AS normalized_total, (SELECT SUM(amount) FROM SAKILA.DW.FACT_PAYMENT) AS star_total;
++---------------------------------------------------+
+| STEP              | NORMALIZED_TOTAL | STAR_TOTAL |
+|-------------------+------------------+------------|
+| 3.2 total revenue | 67406.56         | 67406.56   |
++---------------------------------------------------+
+SELECT '3.2 how many customers?' AS step, (SELECT COUNT(*) FROM SAKILA.OLTP.customer) AS normalized,
+       (SELECT COUNT(*) FROM SAKILA.DW.DIM_CUSTOMER) AS star_count_star_WRONG,
+       (SELECT COUNT(DISTINCT customer_id) FROM SAKILA.DW.DIM_CUSTOMER) AS star_count_distinct_customer_id,
+       (SELECT COUNT(*) FROM SAKILA.DW.DIM_CUSTOMER WHERE is_current) AS star_current_versions;
++------------------------------------------------------------------------------------------------------------------------+
+| STEP                    | NORMALIZED | STAR_COUNT_STAR_WRONG | STAR_COUNT_DISTINCT_CUSTOMER_ID | STAR_CURRENT_VERSIONS |
+|-------------------------+------------+-----------------------+---------------------------------+-----------------------|
+| 3.2 how many customers? | 599        | 600                   | 599                             | 599                   |
++------------------------------------------------------------------------------------------------------------------------+
+SELECT '3.2 film 1 rentals by list price' AS step, f.rental_rate AS list_price_when_rented_star, (SELECT rental_rate FROM SAKILA.OLTP.film WHERE film_id = 1) AS list_price_today_normalized,
+       COUNT(*) AS rentals
+FROM SAKILA.DW.FACT_RENTAL r JOIN SAKILA.DW.DIM_FILM f ON f.film_key = r.film_key WHERE f.film_id = 1 GROUP BY 2 ORDER BY 2;
++--------------------------------------------------------------------------------------------------------+
+| STEP                             | LIST_PRICE_WHEN_RENTED_STAR | LIST_PRICE_TODAY_NORMALIZED | RENTALS |
+|----------------------------------+-----------------------------+-----------------------------+---------|
+| 3.2 film 1 rentals by list price | 0.99                        | 5.99                        | 23      |
++--------------------------------------------------------------------------------------------------------+
+ROLLBACK;
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+SELECT '3.2 AFTER the rollback' AS step, (SELECT COUNT(*) FROM SAKILA.DW.DIM_CUSTOMER) AS dim_customer_rows, (SELECT COUNT(*) FROM SAKILA.DW.DIM_FILM) AS dim_film_rows,
+       (SELECT rental_rate FROM SAKILA.OLTP.film WHERE film_id = 1) AS oltp_film1_rate,
+       (SELECT address FROM SAKILA.OLTP.address WHERE address_id = (SELECT address_id FROM SAKILA.OLTP.customer WHERE customer_id = 1)) AS oltp_customer1_address;
++-------------------------------------------------------------------------------------------------------+
+| STEP                   | DIM_CUSTOMER_ROWS | DIM_FILM_ROWS | OLTP_FILM1_RATE | OLTP_CUSTOMER1_ADDRESS |
+|------------------------+-------------------+---------------+-----------------+------------------------|
+| 3.2 AFTER the rollback | 599               | 1000          | 0.99            | 1913 Hanoi Way         |
++-------------------------------------------------------------------------------------------------------+
+SELECT '3.3a columns in SAKILA.DW that mention an actor' AS step, COUNT(*) AS columns_found
+FROM SAKILA.INFORMATION_SCHEMA.COLUMNS WHERE table_schema = 'DW' AND (column_name ILIKE '%actor%' OR table_name ILIKE '%actor%');
++-----------------------------------------------------------------+
+| STEP                                            | COLUMNS_FOUND |
+|-------------------------------------------------+---------------|
+| 3.3a columns in SAKILA.DW that mention an actor | 0             |
++-----------------------------------------------------------------+
+SELECT '3.3b naive join on film_actor' AS step, SUM(rev) AS sum_of_actor_revenues, (SELECT SUM(amount) FROM SAKILA.OLTP.payment) AS true_total_revenue,
+       ROUND(SUM(rev) / (SELECT SUM(amount) FROM SAKILA.OLTP.payment), 2) AS overcount_factor
+FROM (SELECT fa.actor_id, SUM(p.amount) AS rev FROM SAKILA.OLTP.payment p JOIN SAKILA.OLTP.rental r ON r.rental_id = p.rental_id
+      JOIN SAKILA.OLTP.inventory i ON i.inventory_id = r.inventory_id JOIN SAKILA.OLTP.film_actor fa ON fa.film_id = i.film_id GROUP BY 1);
++-----------------------------------------------------------------------------------------------+
+| STEP                          | SUM_OF_ACTOR_REVENUES | TRUE_TOTAL_REVENUE | OVERCOUNT_FACTOR |
+|-------------------------------+-----------------------+--------------------+------------------|
+| 3.3b naive join on film_actor | 367559.07             | 67406.56           | 5.45             |
++-----------------------------------------------------------------------------------------------+
+WITH weights AS (
+  SELECT f.film_id, fa.actor_id, 1 / COUNT(*) OVER (PARTITION BY f.film_id) AS weighting_factor
+  FROM SAKILA.OLTP.film f JOIN SAKILA.OLTP.film_actor fa ON fa.film_id = f.film_id
+  UNION ALL
+  SELECT f.film_id, -1, 1 FROM SAKILA.OLTP.film f WHERE NOT EXISTS (SELECT 1 FROM SAKILA.OLTP.film_actor fa WHERE fa.film_id = f.film_id)
+), alloc AS (
+  SELECT w.actor_id, SUM(p.amount * w.weighting_factor) AS revenue
+  FROM SAKILA.OLTP.payment p JOIN SAKILA.OLTP.rental r ON r.rental_id = p.rental_id JOIN SAKILA.OLTP.inventory i ON i.inventory_id = r.inventory_id
+  JOIN weights w ON w.film_id = i.film_id GROUP BY 1
+)
+SELECT '3.3c weighted allocation' AS step, ROUND(SUM(revenue), 2) AS allocated_total, (SELECT SUM(amount) FROM SAKILA.OLTP.payment) AS true_total_revenue,
+       IFF(ROUND(SUM(revenue), 2) = (SELECT SUM(amount) FROM SAKILA.OLTP.payment), 'RECONCILES', 'DIFF') AS result,
+       ROUND(SUM(IFF(actor_id = -1, revenue, 0)), 2) AS revenue_of_films_with_no_actor
+FROM alloc;
++---------------------------------------------------------------------------------------------------------------+
+| STEP                     | ALLOCATED_TOTAL | TRUE_TOTAL_REVENUE | RESULT     | REVENUE_OF_FILMS_WITH_NO_ACTOR |
+|--------------------------+-----------------+--------------------+------------+--------------------------------|
+| 3.3c weighted allocation | 67406.56        | 67406.56           | RECONCILES | 199.60                         |
++---------------------------------------------------------------------------------------------------------------+
+WITH weights AS (
+  SELECT f.film_id, fa.actor_id, 1 / COUNT(*) OVER (PARTITION BY f.film_id) AS weighting_factor
+  FROM SAKILA.OLTP.film f JOIN SAKILA.OLTP.film_actor fa ON fa.film_id = f.film_id
+)
+SELECT '3.3d top 5 actors by allocated revenue' AS step, a.first_name || ' ' || a.last_name AS actor, ROUND(SUM(p.amount * w.weighting_factor), 2) AS allocated_revenue
+FROM SAKILA.OLTP.payment p JOIN SAKILA.OLTP.rental r ON r.rental_id = p.rental_id JOIN SAKILA.OLTP.inventory i ON i.inventory_id = r.inventory_id
+JOIN weights w ON w.film_id = i.film_id JOIN SAKILA.OLTP.actor a ON a.actor_id = w.actor_id
+GROUP BY 2 ORDER BY 3 DESC LIMIT 5;
++-----------------------------------------------------------------------------+
+| STEP                                   | ACTOR          | ALLOCATED_REVENUE |
+|----------------------------------------+----------------+-------------------|
+| 3.3d top 5 actors by allocated revenue | SUSAN DAVIS    | 609.77            |
+| 3.3d top 5 actors by allocated revenue | GINA DEGENERES | 607.22            |
+| 3.3d top 5 actors by allocated revenue | JADA RYDER     | 546.99            |
+| 3.3d top 5 actors by allocated revenue | WALTER TORN    | 542.03            |
+| 3.3d top 5 actors by allocated revenue | ANGELA HUDSON  | 531.29            |
++-----------------------------------------------------------------------------+

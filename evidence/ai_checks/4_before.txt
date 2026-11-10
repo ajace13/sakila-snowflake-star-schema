@@ -1,0 +1,1 @@
+tool-log lines before the headless run: 1164  | docs/prompt_log.md lines: 30 | docs/data_dictionary.md exists: no

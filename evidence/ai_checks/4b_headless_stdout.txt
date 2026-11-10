@@ -1,0 +1,22 @@
+I wrote `docs/data_dictionary.md`, but I couldn't log this exchange in `docs/prompt_log.md`. That edit needs write permission that hasn't been granted, so I left it alone. If you grant it, I'll add the entry, or you can paste this in before the "Candidates" heading:
+
+```
+**[26] PROMPT — Aidan → Claude Code**
+Write docs/data_dictionary.md for every table in the SAKILA.DW schema (the Sakila star schema; ignore CLASSICMODELS.DW) from INFORMATION_SCHEMA; cite the query for each fact.
+
+**ANSWER** Wrote docs/data_dictionary.md: 7 tables, 84 columns, 22 constraints from SAKILA.INFORMATION_SCHEMA, each fact tagged Q1–Q6; checks reconcile; FK targets from sql/04 marked (DDL).
+```
+
+The dictionary covers all 7 `SAKILA.DW` tables (5 dimensions, 2 facts). Each has its grain comment, a column-by-column table (type, nullability, comment) and its constraints. Every fact is tagged Q1–Q6, and the exact SQL for each tag is listed at the end of the file. All queries were read-only `snow sql -c claude` SELECTs, and the Q5 and Q6 checks reconcile.
+
+| Check | Result |
+|---|---|
+| Columns | 19+10+17+8+9+9+12 = 84, matching the total column count |
+| Row counts | Live `COUNT(*)` equals the metadata `ROW_COUNT` for all 7 tables |
+| Constraints | 22 in total: 7 primary key, 4 unique, 11 foreign key |
+| `SUM(FACT_PAYMENT.AMOUNT)` | 67,406.56, matching `docs/dimensional_model.md` |
+
+- **Constraint columns and FK targets:** these come from `sql/04_dw_ddl.sql`, not INFORMATION_SCHEMA, because INFORMATION_SCHEMA only gives system-generated constraint names. The doc marks them **(DDL)**.
+- **Types:** INFORMATION_SCHEMA reports `TINYINT` and `SMALLINT` as `NUMBER(38,0)` and `VARCHAR(n)` as `TEXT`. The doc uses the reported precision and length and says so.
+- **Keys:** all 22 constraints show `ENFORCED = NO`, so Snowflake doesn't check them. `sql/06` is what checks them.
+- **Comments:** many columns have no comment in the metadata. They show `—` rather than invented descriptions.

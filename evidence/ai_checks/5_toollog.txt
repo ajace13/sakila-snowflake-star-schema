@@ -1,0 +1,16 @@
+tool-log: exists=yes, 131427 bytes, 1188 lines; last modified 2026-10-26 00:43:56
+lines before the headless run started: 1164 -> lines now: 1188  (+24 lines written since)
+of the lines written since, entries by tool type:
+     12 BASH
+      6 sql
+      4 "###
+      1 WRITE
+      1 2>&1
+entries since then that contain INFORMATION_SCHEMA queries (the headless run's, plus mine):
+10
+sample of the log format (time, tool, first 70 chars of the command; paths masked):
+00:40:43  BASH  ls; ls docs 2>/dev/null; tail -5 docs/prompt_log.md 2>/dev/null
+00:40:46  BASH  snow sql -c claude -q "SELECT table_name, table_type, row_count, comment FROM CLASSICMODELS.IN
+00:40:53  BASH  snow sql -c claude -q "SELECT table_name, ordinal_position, column_name, data_type, numeric_pr
+00:40:55  BASH  P=/tmp/claude-1000/-home-<user>-week4-snowflake-claude/746a1b88-3774-49a4-a875-172f9c2663a6/
+hook configured in .claude/settings.json: [' the Claude Code tool log (kept private)']

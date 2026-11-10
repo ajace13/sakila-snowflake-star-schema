@@ -1,0 +1,6 @@
+--- S1 normalized copy: how many of the 8,078 are customer, how many staff
+| PAYMENTS | DIFFER_IN_CUSTOMER | DIFFER_IN_STAFF | DIFFER_IN_BOTH |
+| 16044    | 0                  | 8078            | 0              |
+--- where I wrote the 'customer or staff' claim
+sql/04_dw_ddl.sql:106:-- rental and its payment always point at the same film version; customer_key is resolved at the payment time (who paid, as they were). In the source, 8,078 of the 16,044 payments were taken from a
+docs/dimensional_model.md:35:- Rentals and payments match one to one by count (16,044 each; every rental has exactly one payment), but in **8,078 payments** the customer or the staff member is not the one on the rental. A payment i

@@ -1,0 +1,846 @@
+USE ROLE SYSADMIN;
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+USE WAREHOUSE CLASS_WH;
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+BEGIN;
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+SELECT 'BEFORE' AS step, customer_key, customer_id, country, city, address, valid_from, valid_to, is_current FROM SAKILA.DW.DIM_CUSTOMER WHERE customer_id = 1;
++----------------------------------------------------------------------------------------------------------------------------------+
+| STEP   | CUSTOMER_KEY | CUSTOMER_ID | COUNTRY | CITY   | ADDRESS        | VALID_FROM          | VALID_TO            | IS_CURRENT |
+|--------+--------------+-------------+---------+--------+----------------+---------------------+---------------------+------------|
+| BEFORE | 1            | 1           | Japan   | Sasebo | 1913 Hanoi Way | 1900-01-01 00:00:00 | 9999-12-31 00:00:00 | True       |
++----------------------------------------------------------------------------------------------------------------------------------+
+SELECT 'BEFORE' AS step, film_key, film_id, rental_rate, valid_from, valid_to, is_current FROM SAKILA.DW.DIM_FILM WHERE film_id = 1;
++----------------------------------------------------------------------------------------------------+
+| STEP   | FILM_KEY | FILM_ID | RENTAL_RATE | VALID_FROM          | VALID_TO            | IS_CURRENT |
+|--------+----------+---------+-------------+---------------------+---------------------+------------|
+| BEFORE | 1        | 1       | 0.99        | 1900-01-01 00:00:00 | 9999-12-31 00:00:00 | True       |
++----------------------------------------------------------------------------------------------------+
+SELECT 'BEFORE' AS step, (SELECT COUNT(*) FROM SAKILA.DW.DIM_CUSTOMER) AS dim_customer_rows, (SELECT COUNT(*) FROM SAKILA.DW.DIM_FILM) AS dim_film_rows,
+       (SELECT COUNT(*) FROM SAKILA.DW.FACT_RENTAL) AS fact_rental_rows, (SELECT COUNT(*) FROM SAKILA.DW.FACT_PAYMENT) AS fact_payment_rows;
++-----------------------------------------------------------------------------------+
+| STEP   | DIM_CUSTOMER_ROWS | DIM_FILM_ROWS | FACT_RENTAL_ROWS | FACT_PAYMENT_ROWS |
+|--------+-------------------+---------------+------------------+-------------------|
+| BEFORE | 599               | 1000          | 16044            | 16044             |
++-----------------------------------------------------------------------------------+
+UPDATE SAKILA.OLTP.address SET address = '1 Calle Nueva', city_id = 1
+  WHERE address_id = (SELECT address_id FROM SAKILA.OLTP.customer WHERE customer_id = 1);
++--------------------------------------------------------------+
+| number of rows updated | number of multi-joined rows updated |
+|------------------------+-------------------------------------|
+| 1                      | 0                                   |
++--------------------------------------------------------------+
+UPDATE SAKILA.OLTP.film SET rental_rate = 5.99 WHERE film_id = 1;
++--------------------------------------------------------------+
+| number of rows updated | number of multi-joined rows updated |
+|------------------------+-------------------------------------|
+| 1                      | 0                                   |
++--------------------------------------------------------------+
+UPDATE SAKILA.OLTP.staff SET email = 'mike.changed@sakilastaff.example' WHERE staff_id = 1;
++--------------------------------------------------------------+
+| number of rows updated | number of multi-joined rows updated |
+|------------------------+-------------------------------------|
+| 1                      | 0                                   |
++--------------------------------------------------------------+
+USE ROLE SYSADMIN;
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+USE WAREHOUSE CLASS_WH;
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+USE SCHEMA SAKILA.DW;
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+SET etl_as_of = (SELECT CURRENT_TIMESTAMP()::TIMESTAMP_NTZ(0));
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+MERGE INTO DIM_DATE t USING (
+  SELECT TO_NUMBER(TO_CHAR(d, 'YYYYMMDD')) AS date_key, d AS full_date, YEAR(d) AS year, QUARTER(d) AS quarter, MONTH(d) AS month,
+         MONTHNAME(d) AS month_name, DAY(d) AS day_of_month, DAYOFWEEKISO(d) AS day_of_week, DAYNAME(d) AS day_name,
+         DAYOFWEEKISO(d) >= 6 AS is_weekend
+  FROM (SELECT DATEADD(day, SEQ4(), '2005-01-01'::DATE) AS d FROM TABLE(GENERATOR(ROWCOUNT => 9496)))
+  UNION ALL
+  SELECT -1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL        
+) s ON t.date_key = s.date_key
+WHEN NOT MATCHED THEN INSERT (date_key, full_date, year, quarter, month, month_name, day_of_month, day_of_week, day_name, is_weekend)
+  VALUES (s.date_key, s.full_date, s.year, s.quarter, s.month, s.month_name, s.day_of_month, s.day_of_week, s.day_name, s.is_weekend);
++-------------------------+
+| number of rows inserted |
+|-------------------------|
+| 0                       |
++-------------------------+
+MERGE INTO DIM_STORE t USING (
+  SELECT s.store_id, m.first_name || ' ' || m.last_name AS manager_name, a.address, a.district, a.postal_code, ci.city, co.country,
+         MD5(TO_JSON(ARRAY_CONSTRUCT(m.first_name, m.last_name, a.address, a.district, a.postal_code, ci.city, co.country))) AS row_hash
+  FROM SAKILA.OLTP.store s
+  JOIN SAKILA.OLTP.staff m ON m.staff_id = s.manager_staff_id
+  JOIN SAKILA.OLTP.address a ON a.address_id = s.address_id
+  JOIN SAKILA.OLTP.city ci ON ci.city_id = a.city_id
+  JOIN SAKILA.OLTP.country co ON co.country_id = ci.country_id
+) src ON t.store_id = src.store_id
+WHEN MATCHED AND t.row_hash <> src.row_hash THEN UPDATE SET
+  manager_name = src.manager_name, address = src.address, district = src.district, postal_code = src.postal_code,
+  city = src.city, country = src.country, row_hash = src.row_hash
+WHEN NOT MATCHED THEN INSERT (store_id, manager_name, address, district, postal_code, city, country, row_hash)
+  VALUES (src.store_id, src.manager_name, src.address, src.district, src.postal_code, src.city, src.country, src.row_hash);
++--------------------------------------------------+
+| number of rows inserted | number of rows updated |
+|-------------------------+------------------------|
+| 0                       | 0                      |
++--------------------------------------------------+
+MERGE INTO DIM_STAFF t USING (
+  SELECT staff_id, first_name || ' ' || last_name AS staff_name, email, username, store_id AS home_store_id, active,
+         MD5(TO_JSON(ARRAY_CONSTRUCT(first_name, last_name, email, username, store_id, active))) AS row_hash
+  FROM SAKILA.OLTP.staff
+) src ON t.staff_id = src.staff_id
+WHEN MATCHED AND t.row_hash <> src.row_hash THEN UPDATE SET
+  staff_name = src.staff_name, email = src.email, username = src.username, home_store_id = src.home_store_id,
+  active = src.active, row_hash = src.row_hash
+WHEN NOT MATCHED THEN INSERT (staff_id, staff_name, email, username, home_store_id, active, row_hash)
+  VALUES (src.staff_id, src.staff_name, src.email, src.username, src.home_store_id, src.active, src.row_hash);
++--------------------------------------------------+
+| number of rows inserted | number of rows updated |
+|-------------------------+------------------------|
+| 0                       | 1                      |
++--------------------------------------------------+
+MERGE INTO DIM_CUSTOMER t USING (
+  WITH src AS (
+    SELECT c.customer_id, c.first_name, c.last_name, c.email, c.active, c.store_id, c.create_date,
+           a.address, a.address2, a.district, a.postal_code, a.phone, ci.city, co.country,
+           MD5(TO_JSON(ARRAY_CONSTRUCT(c.first_name, c.last_name, c.email, c.active, c.store_id, c.create_date,
+                                       a.address, a.address2, a.district, a.postal_code, a.phone, ci.city, co.country))) AS row_hash
+    FROM SAKILA.OLTP.customer c
+    JOIN SAKILA.OLTP.address a ON a.address_id = c.address_id
+    JOIN SAKILA.OLTP.city ci ON ci.city_id = a.city_id
+    JOIN SAKILA.OLTP.country co ON co.country_id = ci.country_id
+  )
+  SELECT s.customer_id AS merge_key, FALSE AS is_new_version, s.* FROM src s
+  UNION ALL
+  SELECT NULL, TRUE, s.* FROM src s
+  JOIN DIM_CUSTOMER d ON d.customer_id = s.customer_id AND d.is_current AND d.row_hash <> s.row_hash
+) u ON t.customer_id = u.merge_key AND t.is_current
+WHEN MATCHED AND t.row_hash <> u.row_hash THEN UPDATE SET valid_to = $etl_as_of, is_current = FALSE
+WHEN NOT MATCHED THEN INSERT (customer_id, first_name, last_name, email, active, store_id, create_date, address, address2, district,
+                              postal_code, phone, city, country, row_hash, valid_from, valid_to, is_current)
+  VALUES (u.customer_id, u.first_name, u.last_name, u.email, u.active, u.store_id, u.create_date, u.address, u.address2, u.district,
+          u.postal_code, u.phone, u.city, u.country, u.row_hash,
+          IFF(u.is_new_version, $etl_as_of, '1900-01-01'::TIMESTAMP_NTZ(0)), '9999-12-31'::TIMESTAMP_NTZ(0), TRUE);
++--------------------------------------------------+
+| number of rows inserted | number of rows updated |
+|-------------------------+------------------------|
+| 1                       | 1                      |
++--------------------------------------------------+
+MERGE INTO DIM_FILM t USING (
+  WITH src AS (
+    SELECT f.film_id, f.title, f.release_year, l.name AS language, ol.name AS original_language, cat.name AS category,
+           f.rating, f.special_features, f.length, f.rental_duration, f.rental_rate, f.replacement_cost,
+           MD5(TO_JSON(ARRAY_CONSTRUCT(f.title, f.release_year, l.name, ol.name, cat.name, f.rating, f.special_features, f.length,
+                                       f.rental_duration, f.rental_rate, f.replacement_cost))) AS row_hash
+    FROM SAKILA.OLTP.film f
+    JOIN SAKILA.OLTP.language l ON l.language_id = f.language_id
+    LEFT JOIN SAKILA.OLTP.language ol ON ol.language_id = f.original_language_id
+    JOIN SAKILA.OLTP.film_category fc ON fc.film_id = f.film_id
+    JOIN SAKILA.OLTP.category cat ON cat.category_id = fc.category_id
+  )
+  SELECT s.film_id AS merge_key, FALSE AS is_new_version, s.* FROM src s
+  UNION ALL
+  SELECT NULL, TRUE, s.* FROM src s
+  JOIN DIM_FILM d ON d.film_id = s.film_id AND d.is_current AND d.row_hash <> s.row_hash
+) u ON t.film_id = u.merge_key AND t.is_current
+WHEN MATCHED AND t.row_hash <> u.row_hash THEN UPDATE SET valid_to = $etl_as_of, is_current = FALSE
+WHEN NOT MATCHED THEN INSERT (film_id, title, release_year, language, original_language, category, rating, special_features, length,
+                              rental_duration, rental_rate, replacement_cost, row_hash, valid_from, valid_to, is_current)
+  VALUES (u.film_id, u.title, u.release_year, u.language, u.original_language, u.category, u.rating, u.special_features, u.length,
+          u.rental_duration, u.rental_rate, u.replacement_cost, u.row_hash,
+          IFF(u.is_new_version, $etl_as_of, '1900-01-01'::TIMESTAMP_NTZ(0)), '9999-12-31'::TIMESTAMP_NTZ(0), TRUE);
++--------------------------------------------------+
+| number of rows inserted | number of rows updated |
+|-------------------------+------------------------|
+| 1                       | 1                      |
++--------------------------------------------------+
+MERGE INTO FACT_RENTAL t USING (
+  SELECT r.rental_id, r.inventory_id,
+         TO_NUMBER(TO_CHAR(r.rental_date, 'YYYYMMDD')) AS rental_date_key,
+         IFF(r.return_date IS NULL, -1, TO_NUMBER(TO_CHAR(r.return_date, 'YYYYMMDD'))) AS return_date_key,
+         c.customer_key, f.film_key, st.store_key, sf.staff_key,
+         r.rental_date AS rental_ts, r.return_date AS return_ts, 1 AS rental_count,
+         DATEDIFF('day', r.rental_date, r.return_date) AS days_out
+  FROM SAKILA.OLTP.rental r
+  JOIN SAKILA.OLTP.inventory i ON i.inventory_id = r.inventory_id
+  LEFT JOIN DIM_CUSTOMER c ON c.customer_id = r.customer_id AND r.rental_date >= c.valid_from AND r.rental_date < c.valid_to
+  LEFT JOIN DIM_FILM f ON f.film_id = i.film_id AND r.rental_date >= f.valid_from AND r.rental_date < f.valid_to
+  LEFT JOIN DIM_STORE st ON st.store_id = i.store_id
+  LEFT JOIN DIM_STAFF sf ON sf.staff_id = r.staff_id
+) s ON t.rental_id = s.rental_id
+WHEN MATCHED AND (t.return_ts IS DISTINCT FROM s.return_ts OR t.days_out IS DISTINCT FROM s.days_out) THEN UPDATE SET
+  return_date_key = s.return_date_key, return_ts = s.return_ts, days_out = s.days_out
+WHEN NOT MATCHED THEN INSERT (rental_id, inventory_id, rental_date_key, return_date_key, customer_key, film_key, store_key, staff_key,
+                              rental_ts, return_ts, rental_count, days_out)
+  VALUES (s.rental_id, s.inventory_id, s.rental_date_key, s.return_date_key, s.customer_key, s.film_key, s.store_key, s.staff_key,
+          s.rental_ts, s.return_ts, s.rental_count, s.days_out);
++--------------------------------------------------+
+| number of rows inserted | number of rows updated |
+|-------------------------+------------------------|
+| 0                       | 0                      |
++--------------------------------------------------+
+MERGE INTO FACT_PAYMENT t USING (
+  SELECT p.payment_id, p.rental_id, TO_NUMBER(TO_CHAR(p.payment_date, 'YYYYMMDD')) AS payment_date_key,
+         c.customer_key, f.film_key, st.store_key, sf.staff_key, p.payment_date AS payment_ts, p.amount
+  FROM SAKILA.OLTP.payment p
+  LEFT JOIN SAKILA.OLTP.rental r ON r.rental_id = p.rental_id
+  LEFT JOIN SAKILA.OLTP.inventory i ON i.inventory_id = r.inventory_id
+  LEFT JOIN DIM_CUSTOMER c ON c.customer_id = p.customer_id AND p.payment_date >= c.valid_from AND p.payment_date < c.valid_to
+  LEFT JOIN DIM_FILM f ON f.film_id = i.film_id AND r.rental_date >= f.valid_from AND r.rental_date < f.valid_to
+  LEFT JOIN DIM_STORE st ON st.store_id = i.store_id
+  LEFT JOIN DIM_STAFF sf ON sf.staff_id = p.staff_id
+) s ON t.payment_id = s.payment_id
+WHEN MATCHED AND t.amount <> s.amount THEN UPDATE SET amount = s.amount
+WHEN NOT MATCHED THEN INSERT (payment_id, rental_id, payment_date_key, customer_key, film_key, store_key, staff_key, payment_ts, amount)
+  VALUES (s.payment_id, s.rental_id, s.payment_date_key, s.customer_key, s.film_key, s.store_key, s.staff_key, s.payment_ts, s.amount);
++--------------------------------------------------+
+| number of rows inserted | number of rows updated |
+|-------------------------+------------------------|
+| 0                       | 0                      |
++--------------------------------------------------+
+INSERT INTO SAKILA.OLTP.rental (rental_id, rental_date, inventory_id, customer_id, return_date, staff_id, last_update)
+  SELECT 99999, CURRENT_TIMESTAMP()::TIMESTAMP_NTZ(0), MIN(inventory_id), 1, NULL, 1, CURRENT_TIMESTAMP()::TIMESTAMP_NTZ(0)
+  FROM SAKILA.OLTP.inventory WHERE film_id = 1;
++-------------------------+
+| number of rows inserted |
+|-------------------------|
+| 1                       |
++-------------------------+
+INSERT INTO SAKILA.OLTP.payment (payment_id, customer_id, staff_id, rental_id, amount, payment_date, last_update)
+  VALUES (99999, 1, 1, 99999, 5.99, CURRENT_TIMESTAMP()::TIMESTAMP_NTZ(0), CURRENT_TIMESTAMP()::TIMESTAMP_NTZ(0));
++-------------------------+
+| number of rows inserted |
+|-------------------------|
+| 1                       |
++-------------------------+
+USE ROLE SYSADMIN;
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+USE WAREHOUSE CLASS_WH;
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+USE SCHEMA SAKILA.DW;
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+SET etl_as_of = (SELECT CURRENT_TIMESTAMP()::TIMESTAMP_NTZ(0));
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+MERGE INTO DIM_DATE t USING (
+  SELECT TO_NUMBER(TO_CHAR(d, 'YYYYMMDD')) AS date_key, d AS full_date, YEAR(d) AS year, QUARTER(d) AS quarter, MONTH(d) AS month,
+         MONTHNAME(d) AS month_name, DAY(d) AS day_of_month, DAYOFWEEKISO(d) AS day_of_week, DAYNAME(d) AS day_name,
+         DAYOFWEEKISO(d) >= 6 AS is_weekend
+  FROM (SELECT DATEADD(day, SEQ4(), '2005-01-01'::DATE) AS d FROM TABLE(GENERATOR(ROWCOUNT => 9496)))
+  UNION ALL
+  SELECT -1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL        
+) s ON t.date_key = s.date_key
+WHEN NOT MATCHED THEN INSERT (date_key, full_date, year, quarter, month, month_name, day_of_month, day_of_week, day_name, is_weekend)
+  VALUES (s.date_key, s.full_date, s.year, s.quarter, s.month, s.month_name, s.day_of_month, s.day_of_week, s.day_name, s.is_weekend);
++-------------------------+
+| number of rows inserted |
+|-------------------------|
+| 0                       |
++-------------------------+
+MERGE INTO DIM_STORE t USING (
+  SELECT s.store_id, m.first_name || ' ' || m.last_name AS manager_name, a.address, a.district, a.postal_code, ci.city, co.country,
+         MD5(TO_JSON(ARRAY_CONSTRUCT(m.first_name, m.last_name, a.address, a.district, a.postal_code, ci.city, co.country))) AS row_hash
+  FROM SAKILA.OLTP.store s
+  JOIN SAKILA.OLTP.staff m ON m.staff_id = s.manager_staff_id
+  JOIN SAKILA.OLTP.address a ON a.address_id = s.address_id
+  JOIN SAKILA.OLTP.city ci ON ci.city_id = a.city_id
+  JOIN SAKILA.OLTP.country co ON co.country_id = ci.country_id
+) src ON t.store_id = src.store_id
+WHEN MATCHED AND t.row_hash <> src.row_hash THEN UPDATE SET
+  manager_name = src.manager_name, address = src.address, district = src.district, postal_code = src.postal_code,
+  city = src.city, country = src.country, row_hash = src.row_hash
+WHEN NOT MATCHED THEN INSERT (store_id, manager_name, address, district, postal_code, city, country, row_hash)
+  VALUES (src.store_id, src.manager_name, src.address, src.district, src.postal_code, src.city, src.country, src.row_hash);
++--------------------------------------------------+
+| number of rows inserted | number of rows updated |
+|-------------------------+------------------------|
+| 0                       | 0                      |
++--------------------------------------------------+
+MERGE INTO DIM_STAFF t USING (
+  SELECT staff_id, first_name || ' ' || last_name AS staff_name, email, username, store_id AS home_store_id, active,
+         MD5(TO_JSON(ARRAY_CONSTRUCT(first_name, last_name, email, username, store_id, active))) AS row_hash
+  FROM SAKILA.OLTP.staff
+) src ON t.staff_id = src.staff_id
+WHEN MATCHED AND t.row_hash <> src.row_hash THEN UPDATE SET
+  staff_name = src.staff_name, email = src.email, username = src.username, home_store_id = src.home_store_id,
+  active = src.active, row_hash = src.row_hash
+WHEN NOT MATCHED THEN INSERT (staff_id, staff_name, email, username, home_store_id, active, row_hash)
+  VALUES (src.staff_id, src.staff_name, src.email, src.username, src.home_store_id, src.active, src.row_hash);
++--------------------------------------------------+
+| number of rows inserted | number of rows updated |
+|-------------------------+------------------------|
+| 0                       | 0                      |
++--------------------------------------------------+
+MERGE INTO DIM_CUSTOMER t USING (
+  WITH src AS (
+    SELECT c.customer_id, c.first_name, c.last_name, c.email, c.active, c.store_id, c.create_date,
+           a.address, a.address2, a.district, a.postal_code, a.phone, ci.city, co.country,
+           MD5(TO_JSON(ARRAY_CONSTRUCT(c.first_name, c.last_name, c.email, c.active, c.store_id, c.create_date,
+                                       a.address, a.address2, a.district, a.postal_code, a.phone, ci.city, co.country))) AS row_hash
+    FROM SAKILA.OLTP.customer c
+    JOIN SAKILA.OLTP.address a ON a.address_id = c.address_id
+    JOIN SAKILA.OLTP.city ci ON ci.city_id = a.city_id
+    JOIN SAKILA.OLTP.country co ON co.country_id = ci.country_id
+  )
+  SELECT s.customer_id AS merge_key, FALSE AS is_new_version, s.* FROM src s
+  UNION ALL
+  SELECT NULL, TRUE, s.* FROM src s
+  JOIN DIM_CUSTOMER d ON d.customer_id = s.customer_id AND d.is_current AND d.row_hash <> s.row_hash
+) u ON t.customer_id = u.merge_key AND t.is_current
+WHEN MATCHED AND t.row_hash <> u.row_hash THEN UPDATE SET valid_to = $etl_as_of, is_current = FALSE
+WHEN NOT MATCHED THEN INSERT (customer_id, first_name, last_name, email, active, store_id, create_date, address, address2, district,
+                              postal_code, phone, city, country, row_hash, valid_from, valid_to, is_current)
+  VALUES (u.customer_id, u.first_name, u.last_name, u.email, u.active, u.store_id, u.create_date, u.address, u.address2, u.district,
+          u.postal_code, u.phone, u.city, u.country, u.row_hash,
+          IFF(u.is_new_version, $etl_as_of, '1900-01-01'::TIMESTAMP_NTZ(0)), '9999-12-31'::TIMESTAMP_NTZ(0), TRUE);
++--------------------------------------------------+
+| number of rows inserted | number of rows updated |
+|-------------------------+------------------------|
+| 0                       | 0                      |
++--------------------------------------------------+
+MERGE INTO DIM_FILM t USING (
+  WITH src AS (
+    SELECT f.film_id, f.title, f.release_year, l.name AS language, ol.name AS original_language, cat.name AS category,
+           f.rating, f.special_features, f.length, f.rental_duration, f.rental_rate, f.replacement_cost,
+           MD5(TO_JSON(ARRAY_CONSTRUCT(f.title, f.release_year, l.name, ol.name, cat.name, f.rating, f.special_features, f.length,
+                                       f.rental_duration, f.rental_rate, f.replacement_cost))) AS row_hash
+    FROM SAKILA.OLTP.film f
+    JOIN SAKILA.OLTP.language l ON l.language_id = f.language_id
+    LEFT JOIN SAKILA.OLTP.language ol ON ol.language_id = f.original_language_id
+    JOIN SAKILA.OLTP.film_category fc ON fc.film_id = f.film_id
+    JOIN SAKILA.OLTP.category cat ON cat.category_id = fc.category_id
+  )
+  SELECT s.film_id AS merge_key, FALSE AS is_new_version, s.* FROM src s
+  UNION ALL
+  SELECT NULL, TRUE, s.* FROM src s
+  JOIN DIM_FILM d ON d.film_id = s.film_id AND d.is_current AND d.row_hash <> s.row_hash
+) u ON t.film_id = u.merge_key AND t.is_current
+WHEN MATCHED AND t.row_hash <> u.row_hash THEN UPDATE SET valid_to = $etl_as_of, is_current = FALSE
+WHEN NOT MATCHED THEN INSERT (film_id, title, release_year, language, original_language, category, rating, special_features, length,
+                              rental_duration, rental_rate, replacement_cost, row_hash, valid_from, valid_to, is_current)
+  VALUES (u.film_id, u.title, u.release_year, u.language, u.original_language, u.category, u.rating, u.special_features, u.length,
+          u.rental_duration, u.rental_rate, u.replacement_cost, u.row_hash,
+          IFF(u.is_new_version, $etl_as_of, '1900-01-01'::TIMESTAMP_NTZ(0)), '9999-12-31'::TIMESTAMP_NTZ(0), TRUE);
++--------------------------------------------------+
+| number of rows inserted | number of rows updated |
+|-------------------------+------------------------|
+| 0                       | 0                      |
++--------------------------------------------------+
+MERGE INTO FACT_RENTAL t USING (
+  SELECT r.rental_id, r.inventory_id,
+         TO_NUMBER(TO_CHAR(r.rental_date, 'YYYYMMDD')) AS rental_date_key,
+         IFF(r.return_date IS NULL, -1, TO_NUMBER(TO_CHAR(r.return_date, 'YYYYMMDD'))) AS return_date_key,
+         c.customer_key, f.film_key, st.store_key, sf.staff_key,
+         r.rental_date AS rental_ts, r.return_date AS return_ts, 1 AS rental_count,
+         DATEDIFF('day', r.rental_date, r.return_date) AS days_out
+  FROM SAKILA.OLTP.rental r
+  JOIN SAKILA.OLTP.inventory i ON i.inventory_id = r.inventory_id
+  LEFT JOIN DIM_CUSTOMER c ON c.customer_id = r.customer_id AND r.rental_date >= c.valid_from AND r.rental_date < c.valid_to
+  LEFT JOIN DIM_FILM f ON f.film_id = i.film_id AND r.rental_date >= f.valid_from AND r.rental_date < f.valid_to
+  LEFT JOIN DIM_STORE st ON st.store_id = i.store_id
+  LEFT JOIN DIM_STAFF sf ON sf.staff_id = r.staff_id
+) s ON t.rental_id = s.rental_id
+WHEN MATCHED AND (t.return_ts IS DISTINCT FROM s.return_ts OR t.days_out IS DISTINCT FROM s.days_out) THEN UPDATE SET
+  return_date_key = s.return_date_key, return_ts = s.return_ts, days_out = s.days_out
+WHEN NOT MATCHED THEN INSERT (rental_id, inventory_id, rental_date_key, return_date_key, customer_key, film_key, store_key, staff_key,
+                              rental_ts, return_ts, rental_count, days_out)
+  VALUES (s.rental_id, s.inventory_id, s.rental_date_key, s.return_date_key, s.customer_key, s.film_key, s.store_key, s.staff_key,
+          s.rental_ts, s.return_ts, s.rental_count, s.days_out);
++--------------------------------------------------+
+| number of rows inserted | number of rows updated |
+|-------------------------+------------------------|
+| 1                       | 0                      |
++--------------------------------------------------+
+MERGE INTO FACT_PAYMENT t USING (
+  SELECT p.payment_id, p.rental_id, TO_NUMBER(TO_CHAR(p.payment_date, 'YYYYMMDD')) AS payment_date_key,
+         c.customer_key, f.film_key, st.store_key, sf.staff_key, p.payment_date AS payment_ts, p.amount
+  FROM SAKILA.OLTP.payment p
+  LEFT JOIN SAKILA.OLTP.rental r ON r.rental_id = p.rental_id
+  LEFT JOIN SAKILA.OLTP.inventory i ON i.inventory_id = r.inventory_id
+  LEFT JOIN DIM_CUSTOMER c ON c.customer_id = p.customer_id AND p.payment_date >= c.valid_from AND p.payment_date < c.valid_to
+  LEFT JOIN DIM_FILM f ON f.film_id = i.film_id AND r.rental_date >= f.valid_from AND r.rental_date < f.valid_to
+  LEFT JOIN DIM_STORE st ON st.store_id = i.store_id
+  LEFT JOIN DIM_STAFF sf ON sf.staff_id = p.staff_id
+) s ON t.payment_id = s.payment_id
+WHEN MATCHED AND t.amount <> s.amount THEN UPDATE SET amount = s.amount
+WHEN NOT MATCHED THEN INSERT (payment_id, rental_id, payment_date_key, customer_key, film_key, store_key, staff_key, payment_ts, amount)
+  VALUES (s.payment_id, s.rental_id, s.payment_date_key, s.customer_key, s.film_key, s.store_key, s.staff_key, s.payment_ts, s.amount);
++--------------------------------------------------+
+| number of rows inserted | number of rows updated |
+|-------------------------+------------------------|
+| 1                       | 0                      |
++--------------------------------------------------+
+SELECT 'AFTER' AS step, customer_key, customer_id, country, city, address, valid_from, valid_to, is_current FROM SAKILA.DW.DIM_CUSTOMER WHERE customer_id = 1 ORDER BY valid_from;
++-----------------------------------------------------------------------------------------------------------------------------------------------+
+| STEP  | CUSTOMER_KEY | CUSTOMER_ID | COUNTRY | CITY                 | ADDRESS        | VALID_FROM          | VALID_TO            | IS_CURRENT |
+|-------+--------------+-------------+---------+----------------------+----------------+---------------------+---------------------+------------|
+| AFTER | 1            | 1           | Japan   | Sasebo               | 1913 Hanoi Way | 1900-01-01 00:00:00 | 2026-10-25 13:59:46 | False      |
+| AFTER | 3401         | 1           | Spain   | A Coruña (La Coruña) | 1 Calle Nueva  | 2026-10-25 13:59:46 | 9999-12-31 00:00:00 | True       |
++-----------------------------------------------------------------------------------------------------------------------------------------------+
+SELECT 'AFTER' AS step, film_key, film_id, rental_rate, valid_from, valid_to, is_current FROM SAKILA.DW.DIM_FILM WHERE film_id = 1 ORDER BY valid_from;
++---------------------------------------------------------------------------------------------------+
+| STEP  | FILM_KEY | FILM_ID | RENTAL_RATE | VALID_FROM          | VALID_TO            | IS_CURRENT |
+|-------+----------+---------+-------------+---------------------+---------------------+------------|
+| AFTER | 1        | 1       | 0.99        | 1900-01-01 00:00:00 | 2026-10-25 13:59:46 | False      |
+| AFTER | 6201     | 1       | 5.99        | 2026-10-25 13:59:46 | 9999-12-31 00:00:00 | True       |
++---------------------------------------------------------------------------------------------------+
+SELECT 'AFTER' AS step, staff_id, email, COUNT(*) OVER () AS dim_staff_rows FROM SAKILA.DW.DIM_STAFF WHERE staff_id = 1;
++----------------------------------------------------------------------+
+| STEP  | STAFF_ID | EMAIL                            | DIM_STAFF_ROWS |
+|-------+----------+----------------------------------+----------------|
+| AFTER | 1        | mike.changed@sakilastaff.example | 1              |
++----------------------------------------------------------------------+
+SELECT c.country AS customer_country_when_it_happened, c.is_current AS version_is_current, COUNT(*) AS payments, SUM(p.amount) AS revenue
+FROM SAKILA.DW.FACT_PAYMENT p JOIN SAKILA.DW.DIM_CUSTOMER c ON c.customer_key = p.customer_key
+WHERE c.customer_id = 1 GROUP BY 1, 2 ORDER BY 2;
++-----------------------------------------------------------------------------+
+| CUSTOMER_COUNTRY_WHEN_IT_HAPPENED | VERSION_IS_CURRENT | PAYMENTS | REVENUE |
+|-----------------------------------+--------------------+----------+---------|
+| Japan                             | False              | 32       | 118.68  |
+| Spain                             | True               | 1        | 5.99    |
++-----------------------------------------------------------------------------+
+SELECT f.rental_rate AS list_price_when_rented, f.is_current AS version_is_current, COUNT(*) AS rentals
+FROM SAKILA.DW.FACT_RENTAL r JOIN SAKILA.DW.DIM_FILM f ON f.film_key = r.film_key
+WHERE f.film_id = 1 GROUP BY 1, 2 ORDER BY 2;
++-------------------------------------------------------+
+| LIST_PRICE_WHEN_RENTED | VERSION_IS_CURRENT | RENTALS |
+|------------------------+--------------------+---------|
+| 0.99                   | False              | 23      |
+| 5.99                   | True               | 1       |
++-------------------------------------------------------+
+SELECT 'as it was (fact key)' AS view_of_history, c.country, COUNT(*) AS payments, SUM(p.amount) AS revenue
+FROM SAKILA.DW.FACT_PAYMENT p JOIN SAKILA.DW.DIM_CUSTOMER c ON c.customer_key = p.customer_key WHERE c.customer_id = 1 GROUP BY 2
+UNION ALL
+SELECT 'as it is now (current version)', cur.country, COUNT(*), SUM(p.amount)
+FROM SAKILA.DW.FACT_PAYMENT p JOIN SAKILA.DW.DIM_CUSTOMER c ON c.customer_key = p.customer_key
+JOIN SAKILA.DW.DIM_CUSTOMER cur ON cur.customer_id = c.customer_id AND cur.is_current WHERE c.customer_id = 1 GROUP BY 2
+ORDER BY 1, 2;
++---------------------------------------------------------------+
+| VIEW_OF_HISTORY                | COUNTRY | PAYMENTS | REVENUE |
+|--------------------------------+---------+----------+---------|
+| as it is now (current version) | Spain   | 33       | 124.67  |
+| as it was (fact key)           | Japan   | 32       | 118.68  |
+| as it was (fact key)           | Spain   | 1        | 5.99    |
++---------------------------------------------------------------+
+UPDATE SAKILA.OLTP.rental SET return_date = DATEADD(day, 3, rental_date) WHERE rental_id = 99999;
++--------------------------------------------------------------+
+| number of rows updated | number of multi-joined rows updated |
+|------------------------+-------------------------------------|
+| 1                      | 0                                   |
++--------------------------------------------------------------+
+USE ROLE SYSADMIN;
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+USE WAREHOUSE CLASS_WH;
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+USE SCHEMA SAKILA.DW;
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+SET etl_as_of = (SELECT CURRENT_TIMESTAMP()::TIMESTAMP_NTZ(0));
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+MERGE INTO DIM_DATE t USING (
+  SELECT TO_NUMBER(TO_CHAR(d, 'YYYYMMDD')) AS date_key, d AS full_date, YEAR(d) AS year, QUARTER(d) AS quarter, MONTH(d) AS month,
+         MONTHNAME(d) AS month_name, DAY(d) AS day_of_month, DAYOFWEEKISO(d) AS day_of_week, DAYNAME(d) AS day_name,
+         DAYOFWEEKISO(d) >= 6 AS is_weekend
+  FROM (SELECT DATEADD(day, SEQ4(), '2005-01-01'::DATE) AS d FROM TABLE(GENERATOR(ROWCOUNT => 9496)))
+  UNION ALL
+  SELECT -1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL        
+) s ON t.date_key = s.date_key
+WHEN NOT MATCHED THEN INSERT (date_key, full_date, year, quarter, month, month_name, day_of_month, day_of_week, day_name, is_weekend)
+  VALUES (s.date_key, s.full_date, s.year, s.quarter, s.month, s.month_name, s.day_of_month, s.day_of_week, s.day_name, s.is_weekend);
++-------------------------+
+| number of rows inserted |
+|-------------------------|
+| 0                       |
++-------------------------+
+MERGE INTO DIM_STORE t USING (
+  SELECT s.store_id, m.first_name || ' ' || m.last_name AS manager_name, a.address, a.district, a.postal_code, ci.city, co.country,
+         MD5(TO_JSON(ARRAY_CONSTRUCT(m.first_name, m.last_name, a.address, a.district, a.postal_code, ci.city, co.country))) AS row_hash
+  FROM SAKILA.OLTP.store s
+  JOIN SAKILA.OLTP.staff m ON m.staff_id = s.manager_staff_id
+  JOIN SAKILA.OLTP.address a ON a.address_id = s.address_id
+  JOIN SAKILA.OLTP.city ci ON ci.city_id = a.city_id
+  JOIN SAKILA.OLTP.country co ON co.country_id = ci.country_id
+) src ON t.store_id = src.store_id
+WHEN MATCHED AND t.row_hash <> src.row_hash THEN UPDATE SET
+  manager_name = src.manager_name, address = src.address, district = src.district, postal_code = src.postal_code,
+  city = src.city, country = src.country, row_hash = src.row_hash
+WHEN NOT MATCHED THEN INSERT (store_id, manager_name, address, district, postal_code, city, country, row_hash)
+  VALUES (src.store_id, src.manager_name, src.address, src.district, src.postal_code, src.city, src.country, src.row_hash);
++--------------------------------------------------+
+| number of rows inserted | number of rows updated |
+|-------------------------+------------------------|
+| 0                       | 0                      |
++--------------------------------------------------+
+MERGE INTO DIM_STAFF t USING (
+  SELECT staff_id, first_name || ' ' || last_name AS staff_name, email, username, store_id AS home_store_id, active,
+         MD5(TO_JSON(ARRAY_CONSTRUCT(first_name, last_name, email, username, store_id, active))) AS row_hash
+  FROM SAKILA.OLTP.staff
+) src ON t.staff_id = src.staff_id
+WHEN MATCHED AND t.row_hash <> src.row_hash THEN UPDATE SET
+  staff_name = src.staff_name, email = src.email, username = src.username, home_store_id = src.home_store_id,
+  active = src.active, row_hash = src.row_hash
+WHEN NOT MATCHED THEN INSERT (staff_id, staff_name, email, username, home_store_id, active, row_hash)
+  VALUES (src.staff_id, src.staff_name, src.email, src.username, src.home_store_id, src.active, src.row_hash);
++--------------------------------------------------+
+| number of rows inserted | number of rows updated |
+|-------------------------+------------------------|
+| 0                       | 0                      |
++--------------------------------------------------+
+MERGE INTO DIM_CUSTOMER t USING (
+  WITH src AS (
+    SELECT c.customer_id, c.first_name, c.last_name, c.email, c.active, c.store_id, c.create_date,
+           a.address, a.address2, a.district, a.postal_code, a.phone, ci.city, co.country,
+           MD5(TO_JSON(ARRAY_CONSTRUCT(c.first_name, c.last_name, c.email, c.active, c.store_id, c.create_date,
+                                       a.address, a.address2, a.district, a.postal_code, a.phone, ci.city, co.country))) AS row_hash
+    FROM SAKILA.OLTP.customer c
+    JOIN SAKILA.OLTP.address a ON a.address_id = c.address_id
+    JOIN SAKILA.OLTP.city ci ON ci.city_id = a.city_id
+    JOIN SAKILA.OLTP.country co ON co.country_id = ci.country_id
+  )
+  SELECT s.customer_id AS merge_key, FALSE AS is_new_version, s.* FROM src s
+  UNION ALL
+  SELECT NULL, TRUE, s.* FROM src s
+  JOIN DIM_CUSTOMER d ON d.customer_id = s.customer_id AND d.is_current AND d.row_hash <> s.row_hash
+) u ON t.customer_id = u.merge_key AND t.is_current
+WHEN MATCHED AND t.row_hash <> u.row_hash THEN UPDATE SET valid_to = $etl_as_of, is_current = FALSE
+WHEN NOT MATCHED THEN INSERT (customer_id, first_name, last_name, email, active, store_id, create_date, address, address2, district,
+                              postal_code, phone, city, country, row_hash, valid_from, valid_to, is_current)
+  VALUES (u.customer_id, u.first_name, u.last_name, u.email, u.active, u.store_id, u.create_date, u.address, u.address2, u.district,
+          u.postal_code, u.phone, u.city, u.country, u.row_hash,
+          IFF(u.is_new_version, $etl_as_of, '1900-01-01'::TIMESTAMP_NTZ(0)), '9999-12-31'::TIMESTAMP_NTZ(0), TRUE);
++--------------------------------------------------+
+| number of rows inserted | number of rows updated |
+|-------------------------+------------------------|
+| 0                       | 0                      |
++--------------------------------------------------+
+MERGE INTO DIM_FILM t USING (
+  WITH src AS (
+    SELECT f.film_id, f.title, f.release_year, l.name AS language, ol.name AS original_language, cat.name AS category,
+           f.rating, f.special_features, f.length, f.rental_duration, f.rental_rate, f.replacement_cost,
+           MD5(TO_JSON(ARRAY_CONSTRUCT(f.title, f.release_year, l.name, ol.name, cat.name, f.rating, f.special_features, f.length,
+                                       f.rental_duration, f.rental_rate, f.replacement_cost))) AS row_hash
+    FROM SAKILA.OLTP.film f
+    JOIN SAKILA.OLTP.language l ON l.language_id = f.language_id
+    LEFT JOIN SAKILA.OLTP.language ol ON ol.language_id = f.original_language_id
+    JOIN SAKILA.OLTP.film_category fc ON fc.film_id = f.film_id
+    JOIN SAKILA.OLTP.category cat ON cat.category_id = fc.category_id
+  )
+  SELECT s.film_id AS merge_key, FALSE AS is_new_version, s.* FROM src s
+  UNION ALL
+  SELECT NULL, TRUE, s.* FROM src s
+  JOIN DIM_FILM d ON d.film_id = s.film_id AND d.is_current AND d.row_hash <> s.row_hash
+) u ON t.film_id = u.merge_key AND t.is_current
+WHEN MATCHED AND t.row_hash <> u.row_hash THEN UPDATE SET valid_to = $etl_as_of, is_current = FALSE
+WHEN NOT MATCHED THEN INSERT (film_id, title, release_year, language, original_language, category, rating, special_features, length,
+                              rental_duration, rental_rate, replacement_cost, row_hash, valid_from, valid_to, is_current)
+  VALUES (u.film_id, u.title, u.release_year, u.language, u.original_language, u.category, u.rating, u.special_features, u.length,
+          u.rental_duration, u.rental_rate, u.replacement_cost, u.row_hash,
+          IFF(u.is_new_version, $etl_as_of, '1900-01-01'::TIMESTAMP_NTZ(0)), '9999-12-31'::TIMESTAMP_NTZ(0), TRUE);
++--------------------------------------------------+
+| number of rows inserted | number of rows updated |
+|-------------------------+------------------------|
+| 0                       | 0                      |
++--------------------------------------------------+
+MERGE INTO FACT_RENTAL t USING (
+  SELECT r.rental_id, r.inventory_id,
+         TO_NUMBER(TO_CHAR(r.rental_date, 'YYYYMMDD')) AS rental_date_key,
+         IFF(r.return_date IS NULL, -1, TO_NUMBER(TO_CHAR(r.return_date, 'YYYYMMDD'))) AS return_date_key,
+         c.customer_key, f.film_key, st.store_key, sf.staff_key,
+         r.rental_date AS rental_ts, r.return_date AS return_ts, 1 AS rental_count,
+         DATEDIFF('day', r.rental_date, r.return_date) AS days_out
+  FROM SAKILA.OLTP.rental r
+  JOIN SAKILA.OLTP.inventory i ON i.inventory_id = r.inventory_id
+  LEFT JOIN DIM_CUSTOMER c ON c.customer_id = r.customer_id AND r.rental_date >= c.valid_from AND r.rental_date < c.valid_to
+  LEFT JOIN DIM_FILM f ON f.film_id = i.film_id AND r.rental_date >= f.valid_from AND r.rental_date < f.valid_to
+  LEFT JOIN DIM_STORE st ON st.store_id = i.store_id
+  LEFT JOIN DIM_STAFF sf ON sf.staff_id = r.staff_id
+) s ON t.rental_id = s.rental_id
+WHEN MATCHED AND (t.return_ts IS DISTINCT FROM s.return_ts OR t.days_out IS DISTINCT FROM s.days_out) THEN UPDATE SET
+  return_date_key = s.return_date_key, return_ts = s.return_ts, days_out = s.days_out
+WHEN NOT MATCHED THEN INSERT (rental_id, inventory_id, rental_date_key, return_date_key, customer_key, film_key, store_key, staff_key,
+                              rental_ts, return_ts, rental_count, days_out)
+  VALUES (s.rental_id, s.inventory_id, s.rental_date_key, s.return_date_key, s.customer_key, s.film_key, s.store_key, s.staff_key,
+          s.rental_ts, s.return_ts, s.rental_count, s.days_out);
++--------------------------------------------------+
+| number of rows inserted | number of rows updated |
+|-------------------------+------------------------|
+| 0                       | 1                      |
++--------------------------------------------------+
+MERGE INTO FACT_PAYMENT t USING (
+  SELECT p.payment_id, p.rental_id, TO_NUMBER(TO_CHAR(p.payment_date, 'YYYYMMDD')) AS payment_date_key,
+         c.customer_key, f.film_key, st.store_key, sf.staff_key, p.payment_date AS payment_ts, p.amount
+  FROM SAKILA.OLTP.payment p
+  LEFT JOIN SAKILA.OLTP.rental r ON r.rental_id = p.rental_id
+  LEFT JOIN SAKILA.OLTP.inventory i ON i.inventory_id = r.inventory_id
+  LEFT JOIN DIM_CUSTOMER c ON c.customer_id = p.customer_id AND p.payment_date >= c.valid_from AND p.payment_date < c.valid_to
+  LEFT JOIN DIM_FILM f ON f.film_id = i.film_id AND r.rental_date >= f.valid_from AND r.rental_date < f.valid_to
+  LEFT JOIN DIM_STORE st ON st.store_id = i.store_id
+  LEFT JOIN DIM_STAFF sf ON sf.staff_id = p.staff_id
+) s ON t.payment_id = s.payment_id
+WHEN MATCHED AND t.amount <> s.amount THEN UPDATE SET amount = s.amount
+WHEN NOT MATCHED THEN INSERT (payment_id, rental_id, payment_date_key, customer_key, film_key, store_key, staff_key, payment_ts, amount)
+  VALUES (s.payment_id, s.rental_id, s.payment_date_key, s.customer_key, s.film_key, s.store_key, s.staff_key, s.payment_ts, s.amount);
++--------------------------------------------------+
+| number of rows inserted | number of rows updated |
+|-------------------------+------------------------|
+| 0                       | 0                      |
++--------------------------------------------------+
+SELECT 'RETURNED' AS step, rental_id, return_date_key, days_out, (SELECT COUNT(*) FROM SAKILA.DW.FACT_RENTAL) AS fact_rental_rows
+FROM SAKILA.DW.FACT_RENTAL WHERE rental_id = 99999;
++----------------------------------------------------------------------+
+| STEP     | RENTAL_ID | RETURN_DATE_KEY | DAYS_OUT | FACT_RENTAL_ROWS |
+|----------+-----------+-----------------+----------+------------------|
+| RETURNED | 99999     | 20261028        | 3        | 16045            |
++----------------------------------------------------------------------+
+USE ROLE SYSADMIN;
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+USE WAREHOUSE CLASS_WH;
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+USE SCHEMA SAKILA.DW;
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+SET etl_as_of = (SELECT CURRENT_TIMESTAMP()::TIMESTAMP_NTZ(0));
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+MERGE INTO DIM_DATE t USING (
+  SELECT TO_NUMBER(TO_CHAR(d, 'YYYYMMDD')) AS date_key, d AS full_date, YEAR(d) AS year, QUARTER(d) AS quarter, MONTH(d) AS month,
+         MONTHNAME(d) AS month_name, DAY(d) AS day_of_month, DAYOFWEEKISO(d) AS day_of_week, DAYNAME(d) AS day_name,
+         DAYOFWEEKISO(d) >= 6 AS is_weekend
+  FROM (SELECT DATEADD(day, SEQ4(), '2005-01-01'::DATE) AS d FROM TABLE(GENERATOR(ROWCOUNT => 9496)))
+  UNION ALL
+  SELECT -1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL        
+) s ON t.date_key = s.date_key
+WHEN NOT MATCHED THEN INSERT (date_key, full_date, year, quarter, month, month_name, day_of_month, day_of_week, day_name, is_weekend)
+  VALUES (s.date_key, s.full_date, s.year, s.quarter, s.month, s.month_name, s.day_of_month, s.day_of_week, s.day_name, s.is_weekend);
++-------------------------+
+| number of rows inserted |
+|-------------------------|
+| 0                       |
++-------------------------+
+MERGE INTO DIM_STORE t USING (
+  SELECT s.store_id, m.first_name || ' ' || m.last_name AS manager_name, a.address, a.district, a.postal_code, ci.city, co.country,
+         MD5(TO_JSON(ARRAY_CONSTRUCT(m.first_name, m.last_name, a.address, a.district, a.postal_code, ci.city, co.country))) AS row_hash
+  FROM SAKILA.OLTP.store s
+  JOIN SAKILA.OLTP.staff m ON m.staff_id = s.manager_staff_id
+  JOIN SAKILA.OLTP.address a ON a.address_id = s.address_id
+  JOIN SAKILA.OLTP.city ci ON ci.city_id = a.city_id
+  JOIN SAKILA.OLTP.country co ON co.country_id = ci.country_id
+) src ON t.store_id = src.store_id
+WHEN MATCHED AND t.row_hash <> src.row_hash THEN UPDATE SET
+  manager_name = src.manager_name, address = src.address, district = src.district, postal_code = src.postal_code,
+  city = src.city, country = src.country, row_hash = src.row_hash
+WHEN NOT MATCHED THEN INSERT (store_id, manager_name, address, district, postal_code, city, country, row_hash)
+  VALUES (src.store_id, src.manager_name, src.address, src.district, src.postal_code, src.city, src.country, src.row_hash);
++--------------------------------------------------+
+| number of rows inserted | number of rows updated |
+|-------------------------+------------------------|
+| 0                       | 0                      |
++--------------------------------------------------+
+MERGE INTO DIM_STAFF t USING (
+  SELECT staff_id, first_name || ' ' || last_name AS staff_name, email, username, store_id AS home_store_id, active,
+         MD5(TO_JSON(ARRAY_CONSTRUCT(first_name, last_name, email, username, store_id, active))) AS row_hash
+  FROM SAKILA.OLTP.staff
+) src ON t.staff_id = src.staff_id
+WHEN MATCHED AND t.row_hash <> src.row_hash THEN UPDATE SET
+  staff_name = src.staff_name, email = src.email, username = src.username, home_store_id = src.home_store_id,
+  active = src.active, row_hash = src.row_hash
+WHEN NOT MATCHED THEN INSERT (staff_id, staff_name, email, username, home_store_id, active, row_hash)
+  VALUES (src.staff_id, src.staff_name, src.email, src.username, src.home_store_id, src.active, src.row_hash);
++--------------------------------------------------+
+| number of rows inserted | number of rows updated |
+|-------------------------+------------------------|
+| 0                       | 0                      |
++--------------------------------------------------+
+MERGE INTO DIM_CUSTOMER t USING (
+  WITH src AS (
+    SELECT c.customer_id, c.first_name, c.last_name, c.email, c.active, c.store_id, c.create_date,
+           a.address, a.address2, a.district, a.postal_code, a.phone, ci.city, co.country,
+           MD5(TO_JSON(ARRAY_CONSTRUCT(c.first_name, c.last_name, c.email, c.active, c.store_id, c.create_date,
+                                       a.address, a.address2, a.district, a.postal_code, a.phone, ci.city, co.country))) AS row_hash
+    FROM SAKILA.OLTP.customer c
+    JOIN SAKILA.OLTP.address a ON a.address_id = c.address_id
+    JOIN SAKILA.OLTP.city ci ON ci.city_id = a.city_id
+    JOIN SAKILA.OLTP.country co ON co.country_id = ci.country_id
+  )
+  SELECT s.customer_id AS merge_key, FALSE AS is_new_version, s.* FROM src s
+  UNION ALL
+  SELECT NULL, TRUE, s.* FROM src s
+  JOIN DIM_CUSTOMER d ON d.customer_id = s.customer_id AND d.is_current AND d.row_hash <> s.row_hash
+) u ON t.customer_id = u.merge_key AND t.is_current
+WHEN MATCHED AND t.row_hash <> u.row_hash THEN UPDATE SET valid_to = $etl_as_of, is_current = FALSE
+WHEN NOT MATCHED THEN INSERT (customer_id, first_name, last_name, email, active, store_id, create_date, address, address2, district,
+                              postal_code, phone, city, country, row_hash, valid_from, valid_to, is_current)
+  VALUES (u.customer_id, u.first_name, u.last_name, u.email, u.active, u.store_id, u.create_date, u.address, u.address2, u.district,
+          u.postal_code, u.phone, u.city, u.country, u.row_hash,
+          IFF(u.is_new_version, $etl_as_of, '1900-01-01'::TIMESTAMP_NTZ(0)), '9999-12-31'::TIMESTAMP_NTZ(0), TRUE);
++--------------------------------------------------+
+| number of rows inserted | number of rows updated |
+|-------------------------+------------------------|
+| 0                       | 0                      |
++--------------------------------------------------+
+MERGE INTO DIM_FILM t USING (
+  WITH src AS (
+    SELECT f.film_id, f.title, f.release_year, l.name AS language, ol.name AS original_language, cat.name AS category,
+           f.rating, f.special_features, f.length, f.rental_duration, f.rental_rate, f.replacement_cost,
+           MD5(TO_JSON(ARRAY_CONSTRUCT(f.title, f.release_year, l.name, ol.name, cat.name, f.rating, f.special_features, f.length,
+                                       f.rental_duration, f.rental_rate, f.replacement_cost))) AS row_hash
+    FROM SAKILA.OLTP.film f
+    JOIN SAKILA.OLTP.language l ON l.language_id = f.language_id
+    LEFT JOIN SAKILA.OLTP.language ol ON ol.language_id = f.original_language_id
+    JOIN SAKILA.OLTP.film_category fc ON fc.film_id = f.film_id
+    JOIN SAKILA.OLTP.category cat ON cat.category_id = fc.category_id
+  )
+  SELECT s.film_id AS merge_key, FALSE AS is_new_version, s.* FROM src s
+  UNION ALL
+  SELECT NULL, TRUE, s.* FROM src s
+  JOIN DIM_FILM d ON d.film_id = s.film_id AND d.is_current AND d.row_hash <> s.row_hash
+) u ON t.film_id = u.merge_key AND t.is_current
+WHEN MATCHED AND t.row_hash <> u.row_hash THEN UPDATE SET valid_to = $etl_as_of, is_current = FALSE
+WHEN NOT MATCHED THEN INSERT (film_id, title, release_year, language, original_language, category, rating, special_features, length,
+                              rental_duration, rental_rate, replacement_cost, row_hash, valid_from, valid_to, is_current)
+  VALUES (u.film_id, u.title, u.release_year, u.language, u.original_language, u.category, u.rating, u.special_features, u.length,
+          u.rental_duration, u.rental_rate, u.replacement_cost, u.row_hash,
+          IFF(u.is_new_version, $etl_as_of, '1900-01-01'::TIMESTAMP_NTZ(0)), '9999-12-31'::TIMESTAMP_NTZ(0), TRUE);
++--------------------------------------------------+
+| number of rows inserted | number of rows updated |
+|-------------------------+------------------------|
+| 0                       | 0                      |
++--------------------------------------------------+
+MERGE INTO FACT_RENTAL t USING (
+  SELECT r.rental_id, r.inventory_id,
+         TO_NUMBER(TO_CHAR(r.rental_date, 'YYYYMMDD')) AS rental_date_key,
+         IFF(r.return_date IS NULL, -1, TO_NUMBER(TO_CHAR(r.return_date, 'YYYYMMDD'))) AS return_date_key,
+         c.customer_key, f.film_key, st.store_key, sf.staff_key,
+         r.rental_date AS rental_ts, r.return_date AS return_ts, 1 AS rental_count,
+         DATEDIFF('day', r.rental_date, r.return_date) AS days_out
+  FROM SAKILA.OLTP.rental r
+  JOIN SAKILA.OLTP.inventory i ON i.inventory_id = r.inventory_id
+  LEFT JOIN DIM_CUSTOMER c ON c.customer_id = r.customer_id AND r.rental_date >= c.valid_from AND r.rental_date < c.valid_to
+  LEFT JOIN DIM_FILM f ON f.film_id = i.film_id AND r.rental_date >= f.valid_from AND r.rental_date < f.valid_to
+  LEFT JOIN DIM_STORE st ON st.store_id = i.store_id
+  LEFT JOIN DIM_STAFF sf ON sf.staff_id = r.staff_id
+) s ON t.rental_id = s.rental_id
+WHEN MATCHED AND (t.return_ts IS DISTINCT FROM s.return_ts OR t.days_out IS DISTINCT FROM s.days_out) THEN UPDATE SET
+  return_date_key = s.return_date_key, return_ts = s.return_ts, days_out = s.days_out
+WHEN NOT MATCHED THEN INSERT (rental_id, inventory_id, rental_date_key, return_date_key, customer_key, film_key, store_key, staff_key,
+                              rental_ts, return_ts, rental_count, days_out)
+  VALUES (s.rental_id, s.inventory_id, s.rental_date_key, s.return_date_key, s.customer_key, s.film_key, s.store_key, s.staff_key,
+          s.rental_ts, s.return_ts, s.rental_count, s.days_out);
++--------------------------------------------------+
+| number of rows inserted | number of rows updated |
+|-------------------------+------------------------|
+| 0                       | 0                      |
++--------------------------------------------------+
+MERGE INTO FACT_PAYMENT t USING (
+  SELECT p.payment_id, p.rental_id, TO_NUMBER(TO_CHAR(p.payment_date, 'YYYYMMDD')) AS payment_date_key,
+         c.customer_key, f.film_key, st.store_key, sf.staff_key, p.payment_date AS payment_ts, p.amount
+  FROM SAKILA.OLTP.payment p
+  LEFT JOIN SAKILA.OLTP.rental r ON r.rental_id = p.rental_id
+  LEFT JOIN SAKILA.OLTP.inventory i ON i.inventory_id = r.inventory_id
+  LEFT JOIN DIM_CUSTOMER c ON c.customer_id = p.customer_id AND p.payment_date >= c.valid_from AND p.payment_date < c.valid_to
+  LEFT JOIN DIM_FILM f ON f.film_id = i.film_id AND r.rental_date >= f.valid_from AND r.rental_date < f.valid_to
+  LEFT JOIN DIM_STORE st ON st.store_id = i.store_id
+  LEFT JOIN DIM_STAFF sf ON sf.staff_id = p.staff_id
+) s ON t.payment_id = s.payment_id
+WHEN MATCHED AND t.amount <> s.amount THEN UPDATE SET amount = s.amount
+WHEN NOT MATCHED THEN INSERT (payment_id, rental_id, payment_date_key, customer_key, film_key, store_key, staff_key, payment_ts, amount)
+  VALUES (s.payment_id, s.rental_id, s.payment_date_key, s.customer_key, s.film_key, s.store_key, s.staff_key, s.payment_ts, s.amount);
++--------------------------------------------------+
+| number of rows inserted | number of rows updated |
+|-------------------------+------------------------|
+| 0                       | 0                      |
++--------------------------------------------------+
+SELECT 'AFTER 3 RELOADS' AS step, (SELECT COUNT(*) FROM SAKILA.DW.DIM_CUSTOMER) AS dim_customer_rows, (SELECT COUNT(*) FROM SAKILA.DW.DIM_FILM) AS dim_film_rows,
+       (SELECT COUNT(*) FROM SAKILA.DW.FACT_RENTAL) AS fact_rental_rows, (SELECT COUNT(*) FROM SAKILA.DW.FACT_PAYMENT) AS fact_payment_rows;
++--------------------------------------------------------------------------------------------+
+| STEP            | DIM_CUSTOMER_ROWS | DIM_FILM_ROWS | FACT_RENTAL_ROWS | FACT_PAYMENT_ROWS |
+|-----------------+-------------------+---------------+------------------+-------------------|
+| AFTER 3 RELOADS | 600               | 1001          | 16045            | 16045             |
++--------------------------------------------------------------------------------------------+
+ROLLBACK;
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+SELECT 'ROLLED BACK' AS step, (SELECT COUNT(*) FROM SAKILA.DW.DIM_CUSTOMER) AS dim_customer_rows, (SELECT COUNT(*) FROM SAKILA.DW.DIM_FILM) AS dim_film_rows,
+       (SELECT COUNT(*) FROM SAKILA.DW.FACT_RENTAL) AS fact_rental_rows, (SELECT COUNT(*) FROM SAKILA.DW.FACT_PAYMENT) AS fact_payment_rows,
+       (SELECT COUNT(*) FROM SAKILA.OLTP.rental) AS oltp_rentals, (SELECT COUNT(*) FROM SAKILA.OLTP.payment) AS oltp_payments,
+       (SELECT rental_rate FROM SAKILA.OLTP.film WHERE film_id = 1) AS oltp_film1_rate, (SELECT email FROM SAKILA.OLTP.staff WHERE staff_id = 1) AS oltp_staff1_email;
++------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| STEP        | DIM_CUSTOMER_ROWS | DIM_FILM_ROWS | FACT_RENTAL_ROWS | FACT_PAYMENT_ROWS | OLTP_RENTALS | OLTP_PAYMENTS | OLTP_FILM1_RATE | OLTP_STAFF1_EMAIL            |
+|-------------+-------------------+---------------+------------------+-------------------+--------------+---------------+-----------------+------------------------------|
+| ROLLED BACK | 599               | 1000          | 16044            | 16044             | 16044        | 16044         | 0.99            | Mike.Hillyer@sakilastaff.com |
++------------------------------------------------------------------------------------------------------------------------------------------------------------------------+

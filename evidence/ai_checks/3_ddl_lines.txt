@@ -1,0 +1,38 @@
+### DDL lines in sql/04_dw_ddl.sql (grep -n; the reviewer's line numbers are checked against these)
+58:  valid_from TIMESTAMP_NTZ(0) NOT NULL COMMENT 'inclusive. First version starts 1900-01-01: its true start is unknown, so it covers all history',
+60:  is_current BOOLEAN NOT NULL,
+62:  UNIQUE (customer_id, valid_from)
+70:  title VARCHAR(128), release_year SMALLINT, language VARCHAR(20), original_language VARCHAR(20), category VARCHAR(25),
+74:  valid_from TIMESTAMP_NTZ(0) NOT NULL COMMENT 'inclusive. First version starts 1900-01-01: its true start is unknown, so it covers all history',
+76:  is_current BOOLEAN NOT NULL,
+78:  UNIQUE (film_id, valid_from)
+85:CREATE TABLE IF NOT EXISTS FACT_RENTAL (
+86:  rental_id INTEGER NOT NULL COMMENT 'degenerate dimension: the source rental number',
+89:  customer_key NUMBER(38,0) NOT NULL COMMENT 'the customer VERSION valid at rental_ts',
+96:  PRIMARY KEY (rental_id),
+103:) COMMENT = 'GRAIN: one row per rental (rental_id) = one copy (inventory_id) rented by one customer on one date, handled by one staff member';
+105:-- Payment: the payment process, kept apart from rentals on purpose. film_key is resolved at the RENTAL time, not the payment time, so a
+108:CREATE TABLE IF NOT EXISTS FACT_PAYMENT (
+110:  rental_id INTEGER NOT NULL COMMENT 'degenerate dimension: the rental this payment settles. 1:1 with FACT_RENTAL in this data (proved in 09), but do not join the two
+112:  customer_key NUMBER(38,0) NOT NULL COMMENT 'the customer VERSION valid at payment_ts, who paid',
+118:  PRIMARY KEY (payment_id),
+124:) COMMENT = 'GRAIN: one row per payment (payment_id) = one amount paid by one customer to one staff member on one date, against one rental';
+
+### load lines in sql/05_dw_load_merge.sql
+9:SET etl_as_of = (SELECT CURRENT_TIMESTAMP()::TIMESTAMP_NTZ(0));
+90:    JOIN SAKILA.OLTP.film_category fc ON fc.film_id = f.film_id
+118:  LEFT JOIN DIM_CUSTOMER c ON c.customer_id = r.customer_id AND r.rental_date >= c.valid_from AND r.rental_date < c.valid_to
+119:  LEFT JOIN DIM_FILM f ON f.film_id = i.film_id AND r.rental_date >= f.valid_from AND r.rental_date < f.valid_to
+122:) s ON t.rental_id = s.rental_id
+139:  LEFT JOIN DIM_CUSTOMER c ON c.customer_id = p.customer_id AND p.payment_date >= c.valid_from AND p.payment_date < c.valid_to
+140:  LEFT JOIN DIM_FILM f ON f.film_id = i.film_id AND r.rental_date >= f.valid_from AND r.rental_date < f.valid_to
+143:) s ON t.payment_id = s.payment_id
+
+### 07 total lines / where the reviewer said the note at 07:126 is
+127
+-- Check: 7 tables in DW, 4 of them with a surrogate key sequence, both facts commented with their grain
+### 04 lines the reviewer cited (source PKs / nullable rental_id)
+164:  PRIMARY KEY (rental_id),
+165:  UNIQUE (rental_date, inventory_id, customer_id),
+174:  rental_id INTEGER,
+178:  PRIMARY KEY (payment_id),

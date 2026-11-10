@@ -1,0 +1,12 @@
+I couldn't write `docs/data_dictionary.md` or append to `docs/prompt_log.md`. Both writes were blocked because permission wasn't granted, so neither file has been changed. I haven't tried another way around the block.
+
+The queries did run. This is what the dictionary would contain:
+
+- **Tables:** `DIM_CUSTOMER` (122 rows), `DIM_DATE` (1,096), `DIM_EMPLOYEE` (23), `DIM_PRODUCT` (110) and `FACT_ORDER_LINE` (2,996). That is 35 columns in all.
+- **Reconciliation:** For every table, the `INFORMATION_SCHEMA.TABLES` row count equals `COUNT(*)` and equals the distinct count at the grain. `SUM(sales_amount)` is 9,604,190.61, which matches CLAUDE.md. No row has a NULL `employee_key`, and every row has `sales_amount = quantity*price_each`.
+- **Keys:** The only constraint is a primary key on the fact, and `ENFORCED = NO`. `INFORMATION_SCHEMA` doesn't list its columns, so the doc takes `(order_number, product_key)` from `sql/02_star_schema.sql` line 43.
+- **Nullability:** Every column reports `IS_NULLABLE = YES`, including the key columns.
+- **Column comments:** There are none. Column meanings and source columns come from `sql/02_star_schema.sql`, and the doc tags each one with its line number. Table-level facts are tagged with the query that returned them.
+- **Not re-derived:** I didn't re-check the DDL-sourced facts against the OLTP tables. The doc points to `/dw-reconcile` for that.
+
+Do you want to grant write access to `docs/data_dictionary.md` and `docs/prompt_log.md`, so I can write them? I can also paste the full markdown here for you to save yourself.

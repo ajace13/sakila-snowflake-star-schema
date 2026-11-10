@@ -1,0 +1,47 @@
+##### FINDING 1: overlapping / duplicate Type 2 versions (07:62, 07:78) and duplicate fact keys
+--- F1a customers with more than one current version, overlapping intervals, duplicate (customer_id, valid_from)
+| CUSTOMERS_WITHOUT_EXACTLY_ONE_CURRENT | OVERLAPPING_PAIRS | DUPLICATE_CUSTOMER_ID_VALID_FROM | ROWS_ | CUSTOMERS |
+| 0                                     | 0                 | 0                                | 599   | 599       |
+--- F1b the same for DIM_FILM
+| FILMS_WITHOUT_EXACTLY_ONE_CURRENT | OVERLAPPING_PAIRS | DUPLICATE_FILM_ID_VALID_FROM | ROWS_ | FILMS |
+| 0                                 | 0                 | 0                            | 1000  | 1000  |
+--- F1c duplicate fact keys (rows minus distinct keys)
+| FACT_RENTAL_DUPES | FACT_PAYMENT_DUPES |
+| 0                 | 0                  |
+
+##### FINDING 2: the two facts and customer_key / chasm trap
+--- F2a same rental, same customer_key in both facts?
+| RENTALS_JOINED_TO_THEIR_PAYMENT | DIFFERENT_CUSTOMER_KEY | DIFFERENT_STAFF_KEY | EITHER |
+| 16044                           | 0                      | 8078                | 8078   |
+--- F2b chasm trap: join both facts on film_key without aggregating first
+| SUM_AMOUNT_AFTER_JOIN | TRUE_SUM_AMOUNT | PAYMENT_INFLATION_FACTOR | SUM_RENTAL_COUNT_AFTER_JOIN | TRUE_RENTALS |
+| 1303261.27            | 67406.56        | 19.3                     | 311350                      | 16044        |
+--- F2c does FACT_PAYMENT have a rental date key or inventory_id?
+| RENTAL_DATE_KEY_OR_INVENTORY_ID_COLUMNS | COLUMNS_IN_FACT_PAYMENT |
+| 0                                       | 9                       |
+
+##### ASIDES the reviewer made (each testable)
+--- A1 same customer renting the same copy twice on one day (grain wording at 07:103)
+| CUSTOMER_COPY_DAYS_WITH_MORE_THAN_ONE_RENTAL | RENTALS_IN_THOSE |
+| 0                                            | 0                |
+--- A2 payments with a NULL rental_id (07:110 NOT NULL vs source nullable)
+| PAYMENTS_WITHOUT_RENTAL | PAYMENTS |
+| 0                       | 16044    |
+--- A3 negative amounts (NUMBER(5,2) would permit refunds)
+| MIN_AMOUNT | NEGATIVE_AMOUNTS | ZERO_AMOUNTS |
+| 0.00       | 0                | 24           |
+--- A4 payments whose customer or staff differs from the rental's (the 8,078 the reviewer could not verify)
+| PAYMENTS | DIFFER_IN_CUSTOMER_OR_STAFF |
+| 16044    | 8078                        |
+--- A5 return_ts IS NULL agrees with return_date_key = -1, row by row
+| RENTALS | DISAGREEING_ROWS |
+| 16044   | 0                |
+--- A6 films with more than one category (DIM_FILM.category is a single column)
+| FILMS | FILMS_WITHOUT_EXACTLY_ONE_CATEGORY |
+| 1000  | 0                                  |
+--- A7 the reviewer's '326' (rental count)
+| SAKILA_RENTALS |
+| 16044          |
+--- A8 the as-of time is session-local, not UTC (08:9)
+| ETL_AS_OF_EXPRESSION | UTC_NOW             | HOURS_DIFFERENCE |
+| 2026-10-25 17:29:21  | 2026-10-26 00:29:21 | -7               |

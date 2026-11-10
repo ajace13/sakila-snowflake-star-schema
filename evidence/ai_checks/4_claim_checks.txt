@@ -1,0 +1,19 @@
+### CLAIM 1: 'Tables: DIM_CUSTOMER (122 rows), DIM_DATE (1,096), DIM_EMPLOYEE (23), DIM_PRODUCT (110) and FACT_ORDER_LINE (2,996). That is 35 columns in all.'
+| TABLE_NAME      | ROW_COUNT | N_COLUMNS |
+| DIM_CUSTOMER    | 122       | 6         |
+| DIM_DATE        | 1096      | 7         |
+| DIM_EMPLOYEE    | 23        | 6         |
+| DIM_PRODUCT     | 110       | 7         |
+| FACT_ORDER_LINE | 2996      | 9         |
+| TABLES_IN_DW | COLUMNS_IN_DW |
+| 5            | 35            |
+### CLAIM 2: 'Every column reports IS_NULLABLE = YES, including the key columns.'
+| COLUMNS_IN_DW | NULLABLE_YES | NULLABLE_NO |
+| 35            | 35           | 0           |
+### CLAIM 3: 'The only constraint is a primary key on the fact, and ENFORCED = NO.'
+| TABLE_NAME      | CONSTRAINT_TYPE | ENFORCED |
+| FACT_ORDER_LINE | PRIMARY KEY     | NO       |
+### CONTEXT: which DW schemas exist in this account (the prompt said 'every DW table')
+| DW_SCHEMA        | TABLES |
+| CLASSICMODELS.DW | 5      |
+| SAKILA.DW        | 7      |

@@ -1,0 +1,333 @@
+USE ROLE SYSADMIN;
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+USE WAREHOUSE CLASS_WH;
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+USE SCHEMA SAKILA.OLTP;
++----------------------------------+
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
++----------------------------------+
+LIST @sakila_stage;
++-------------------------------------------------------------------------------------------------------------+
+| name                           | size    | md5                              | last_modified                 |
+|--------------------------------+---------+----------------------------------+-------------------------------|
+| sakila_stage/actor.csv         | 7456    | e1fdcdf706a2206dac4603798ebd012d | Sun, 25 Oct 2026 20:33:53 GMT |
+| sakila_stage/address.csv       | 62816   | 602821a98b22393b66cd4de1d35b4f0f | Sun, 25 Oct 2026 20:33:52 GMT |
+| sakila_stage/category.csv      | 512     | ef11e80ce2a1482e689cd75544e75963 | Sun, 25 Oct 2026 20:33:52 GMT |
+| sakila_stage/city.csv          | 21952   | bf1974f974f65a88fa2862bf7337552a | Sun, 25 Oct 2026 20:33:52 GMT |
+| sakila_stage/country.csv       | 3632    | 03a275764ceac126ce89f536509828f6 | Sun, 25 Oct 2026 20:33:52 GMT |
+| sakila_stage/customer.csv      | 59040   | 3f629b64492b5f10bc9f1ccbe94d9bfd | Sun, 25 Oct 2026 20:33:53 GMT |
+| sakila_stage/film.csv          | 195168  | 319fa8a437fabe6a2ed3ecaa9668f21a | Sun, 25 Oct 2026 20:33:52 GMT |
+| sakila_stage/film_actor.csv    | 149504  | 296bc98c2588a1c2fe8db81bbf51791d | Sun, 25 Oct 2026 20:33:54 GMT |
+| sakila_stage/film_category.csv | 26352   | d838742b248943d87248768c42aed290 | Sun, 25 Oct 2026 20:33:54 GMT |
+| sakila_stage/film_text.csv     | 114000  | ab4535806394afc6a5d55d3d8fe3c216 | Sun, 25 Oct 2026 20:33:53 GMT |
+| sakila_stage/inventory.csv     | 140464  | 70856aa2e00c0296d8eeedcdec1ced60 | Sun, 25 Oct 2026 20:33:53 GMT |
+| sakila_stage/language.csv      | 224     | a97b73351d7f8adfc3ba4899cbba0e1c | Sun, 25 Oct 2026 20:33:52 GMT |
+| sakila_stage/payment.csv       | 985824  | 1045372bd4cc3b195466fe9c41c7ea2b | Sun, 25 Oct 2026 20:33:57 GMT |
+| sakila_stage/rental.csv        | 1214496 | 7cda2042fbf17f91c7844d6831cd5044 | Sun, 25 Oct 2026 20:33:58 GMT |
+| sakila_stage/staff.csv         | 73040   | 894471a070551d95353ee3d53d430ce4 | Sun, 25 Oct 2026 20:33:53 GMT |
+| sakila_stage/store.csv         | 112     | 96b48eae03c8ab7d054f91d682c560a7 | Sun, 25 Oct 2026 20:33:53 GMT |
++-------------------------------------------------------------------------------------------------------------+
+COPY INTO country       FROM @sakila_stage PATTERN = '(.*/)?country[.]csv([.]gz)?'       FILE_FORMAT = (FORMAT_NAME = sakila_csv) ON_ERROR = ABORT_STATEMENT;
++------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| file                     | status | rows_parsed | rows_loaded | error_limit | errors_seen | first_error | first_error_line | first_error_character | first_error_column_name |
+|--------------------------+--------+-------------+-------------+-------------+-------------+-------------+------------------+-----------------------+-------------------------|
+| sakila_stage/country.csv | LOADED | 109         | 109         | 1           | 0           | None        | None             | None                  | None                    |
++------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+COPY INTO city          FROM @sakila_stage PATTERN = '(.*/)?city[.]csv([.]gz)?'          FILE_FORMAT = (FORMAT_NAME = sakila_csv) ON_ERROR = ABORT_STATEMENT;
++---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| file                  | status | rows_parsed | rows_loaded | error_limit | errors_seen | first_error | first_error_line | first_error_character | first_error_column_name |
+|-----------------------+--------+-------------+-------------+-------------+-------------+-------------+------------------+-----------------------+-------------------------|
+| sakila_stage/city.csv | LOADED | 600         | 600         | 1           | 0           | None        | None             | None                  | None                    |
++---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+COPY INTO address FROM (SELECT $1, $2, $3, $4, $5, $6, $7, TO_GEOMETRY($8), $9 FROM @sakila_stage)
+                                       PATTERN = '(.*/)?address[.]csv([.]gz)?'                                 FILE_FORMAT = (FORMAT_NAME = sakila_csv) ON_ERROR = ABORT_STATEMENT;
++------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| file                     | status | rows_parsed | rows_loaded | error_limit | errors_seen | first_error | first_error_line | first_error_character | first_error_column_name |
+|--------------------------+--------+-------------+-------------+-------------+-------------+-------------+------------------+-----------------------+-------------------------|
+| sakila_stage/address.csv | LOADED | 603         | 603         | 1           | 0           | None        | None             | None                  | None                    |
++------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+COPY INTO category      FROM @sakila_stage PATTERN = '(.*/)?category[.]csv([.]gz)?'      FILE_FORMAT = (FORMAT_NAME = sakila_csv) ON_ERROR = ABORT_STATEMENT;
++-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| file                      | status | rows_parsed | rows_loaded | error_limit | errors_seen | first_error | first_error_line | first_error_character | first_error_column_name |
+|---------------------------+--------+-------------+-------------+-------------+-------------+-------------+------------------+-----------------------+-------------------------|
+| sakila_stage/category.csv | LOADED | 16          | 16          | 1           | 0           | None        | None             | None                  | None                    |
++-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+COPY INTO language      FROM @sakila_stage PATTERN = '(.*/)?language[.]csv([.]gz)?'      FILE_FORMAT = (FORMAT_NAME = sakila_csv) ON_ERROR = ABORT_STATEMENT;
++-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| file                      | status | rows_parsed | rows_loaded | error_limit | errors_seen | first_error | first_error_line | first_error_character | first_error_column_name |
+|---------------------------+--------+-------------+-------------+-------------+-------------+-------------+------------------+-----------------------+-------------------------|
+| sakila_stage/language.csv | LOADED | 6           | 6           | 1           | 0           | None        | None             | None                  | None                    |
++-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+COPY INTO actor         FROM @sakila_stage PATTERN = '(.*/)?actor[.]csv([.]gz)?'         FILE_FORMAT = (FORMAT_NAME = sakila_csv) ON_ERROR = ABORT_STATEMENT;
++----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| file                   | status | rows_parsed | rows_loaded | error_limit | errors_seen | first_error | first_error_line | first_error_character | first_error_column_name |
+|------------------------+--------+-------------+-------------+-------------+-------------+-------------+------------------+-----------------------+-------------------------|
+| sakila_stage/actor.csv | LOADED | 200         | 200         | 1           | 0           | None        | None             | None                  | None                    |
++----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+COPY INTO staff         FROM @sakila_stage PATTERN = '(.*/)?staff[.]csv([.]gz)?'         FILE_FORMAT = (FORMAT_NAME = sakila_csv) ON_ERROR = ABORT_STATEMENT;
++----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| file                   | status | rows_parsed | rows_loaded | error_limit | errors_seen | first_error | first_error_line | first_error_character | first_error_column_name |
+|------------------------+--------+-------------+-------------+-------------+-------------+-------------+------------------+-----------------------+-------------------------|
+| sakila_stage/staff.csv | LOADED | 2           | 2           | 1           | 0           | None        | None             | None                  | None                    |
++----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+COPY INTO store         FROM @sakila_stage PATTERN = '(.*/)?store[.]csv([.]gz)?'         FILE_FORMAT = (FORMAT_NAME = sakila_csv) ON_ERROR = ABORT_STATEMENT;
++----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| file                   | status | rows_parsed | rows_loaded | error_limit | errors_seen | first_error | first_error_line | first_error_character | first_error_column_name |
+|------------------------+--------+-------------+-------------+-------------+-------------+-------------+------------------+-----------------------+-------------------------|
+| sakila_stage/store.csv | LOADED | 2           | 2           | 1           | 0           | None        | None             | None                  | None                    |
++----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+COPY INTO customer      FROM @sakila_stage PATTERN = '(.*/)?customer[.]csv([.]gz)?'      FILE_FORMAT = (FORMAT_NAME = sakila_csv) ON_ERROR = ABORT_STATEMENT;
++-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| file                      | status | rows_parsed | rows_loaded | error_limit | errors_seen | first_error | first_error_line | first_error_character | first_error_column_name |
+|---------------------------+--------+-------------+-------------+-------------+-------------+-------------+------------------+-----------------------+-------------------------|
+| sakila_stage/customer.csv | LOADED | 599         | 599         | 1           | 0           | None        | None             | None                  | None                    |
++-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+COPY INTO film          FROM @sakila_stage PATTERN = '(.*/)?film[.]csv([.]gz)?'          FILE_FORMAT = (FORMAT_NAME = sakila_csv) ON_ERROR = ABORT_STATEMENT;
++---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| file                  | status | rows_parsed | rows_loaded | error_limit | errors_seen | first_error | first_error_line | first_error_character | first_error_column_name |
+|-----------------------+--------+-------------+-------------+-------------+-------------+-------------+------------------+-----------------------+-------------------------|
+| sakila_stage/film.csv | LOADED | 1000        | 1000        | 1           | 0           | None        | None             | None                  | None                    |
++---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+COPY INTO film_actor    FROM @sakila_stage PATTERN = '(.*/)?film_actor[.]csv([.]gz)?'    FILE_FORMAT = (FORMAT_NAME = sakila_csv) ON_ERROR = ABORT_STATEMENT;
++---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| file                        | status | rows_parsed | rows_loaded | error_limit | errors_seen | first_error | first_error_line | first_error_character | first_error_column_name |
+|-----------------------------+--------+-------------+-------------+-------------+-------------+-------------+------------------+-----------------------+-------------------------|
+| sakila_stage/film_actor.csv | LOADED | 5462        | 5462        | 1           | 0           | None        | None             | None                  | None                    |
++---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+COPY INTO film_category FROM @sakila_stage PATTERN = '(.*/)?film_category[.]csv([.]gz)?' FILE_FORMAT = (FORMAT_NAME = sakila_csv) ON_ERROR = ABORT_STATEMENT;
++------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| file                           | status | rows_parsed | rows_loaded | error_limit | errors_seen | first_error | first_error_line | first_error_character | first_error_column_name |
+|--------------------------------+--------+-------------+-------------+-------------+-------------+-------------+------------------+-----------------------+-------------------------|
+| sakila_stage/film_category.csv | LOADED | 1000        | 1000        | 1           | 0           | None        | None             | None                  | None                    |
++------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+COPY INTO film_text     FROM @sakila_stage PATTERN = '(.*/)?film_text[.]csv([.]gz)?'     FILE_FORMAT = (FORMAT_NAME = sakila_csv) ON_ERROR = ABORT_STATEMENT;
++--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| file                       | status | rows_parsed | rows_loaded | error_limit | errors_seen | first_error | first_error_line | first_error_character | first_error_column_name |
+|----------------------------+--------+-------------+-------------+-------------+-------------+-------------+------------------+-----------------------+-------------------------|
+| sakila_stage/film_text.csv | LOADED | 1000        | 1000        | 1           | 0           | None        | None             | None                  | None                    |
++--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+COPY INTO inventory     FROM @sakila_stage PATTERN = '(.*/)?inventory[.]csv([.]gz)?'     FILE_FORMAT = (FORMAT_NAME = sakila_csv) ON_ERROR = ABORT_STATEMENT;
++--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| file                       | status | rows_parsed | rows_loaded | error_limit | errors_seen | first_error | first_error_line | first_error_character | first_error_column_name |
+|----------------------------+--------+-------------+-------------+-------------+-------------+-------------+------------------+-----------------------+-------------------------|
+| sakila_stage/inventory.csv | LOADED | 4581        | 4581        | 1           | 0           | None        | None             | None                  | None                    |
++--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+COPY INTO rental        FROM @sakila_stage PATTERN = '(.*/)?rental[.]csv([.]gz)?'        FILE_FORMAT = (FORMAT_NAME = sakila_csv) ON_ERROR = ABORT_STATEMENT;
++-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| file                    | status | rows_parsed | rows_loaded | error_limit | errors_seen | first_error | first_error_line | first_error_character | first_error_column_name |
+|-------------------------+--------+-------------+-------------+-------------+-------------+-------------+------------------+-----------------------+-------------------------|
+| sakila_stage/rental.csv | LOADED | 16044       | 16044       | 1           | 0           | None        | None             | None                  | None                    |
++-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+COPY INTO payment       FROM @sakila_stage PATTERN = '(.*/)?payment[.]csv([.]gz)?'       FILE_FORMAT = (FORMAT_NAME = sakila_csv) ON_ERROR = ABORT_STATEMENT;
++------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| file                     | status | rows_parsed | rows_loaded | error_limit | errors_seen | first_error | first_error_line | first_error_character | first_error_column_name |
+|--------------------------+--------+-------------+-------------+-------------+-------------+-------------+------------------+-----------------------+-------------------------|
+| sakila_stage/payment.csv | LOADED | 16044       | 16044       | 1           | 0           | None        | None             | None                  | None                    |
++------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+SELECT tbl, source_rows, snowflake_rows, IFF(source_rows = snowflake_rows, 'MATCH', 'DIFF') AS result FROM (
+  SELECT 'actor' AS tbl,         200 AS source_rows,   (SELECT COUNT(*) FROM actor) AS snowflake_rows UNION ALL
+  SELECT 'address',              603,                  (SELECT COUNT(*) FROM address) UNION ALL
+  SELECT 'category',             16,                   (SELECT COUNT(*) FROM category) UNION ALL
+  SELECT 'city',                 600,                  (SELECT COUNT(*) FROM city) UNION ALL
+  SELECT 'country',              109,                  (SELECT COUNT(*) FROM country) UNION ALL
+  SELECT 'customer',             599,                  (SELECT COUNT(*) FROM customer) UNION ALL
+  SELECT 'film',                 1000,                 (SELECT COUNT(*) FROM film) UNION ALL
+  SELECT 'film_actor',           5462,                 (SELECT COUNT(*) FROM film_actor) UNION ALL
+  SELECT 'film_category',        1000,                 (SELECT COUNT(*) FROM film_category) UNION ALL
+  SELECT 'film_text',            1000,                 (SELECT COUNT(*) FROM film_text) UNION ALL
+  SELECT 'inventory',            4581,                 (SELECT COUNT(*) FROM inventory) UNION ALL
+  SELECT 'language',             6,                    (SELECT COUNT(*) FROM language) UNION ALL
+  SELECT 'payment',              16044,                (SELECT COUNT(*) FROM payment) UNION ALL
+  SELECT 'rental',               16044,                (SELECT COUNT(*) FROM rental) UNION ALL
+  SELECT 'staff',                2,                    (SELECT COUNT(*) FROM staff) UNION ALL
+  SELECT 'store',                2,                    (SELECT COUNT(*) FROM store)
+) ORDER BY tbl;
++-------------------------------------------------------+
+| TBL           | SOURCE_ROWS | SNOWFLAKE_ROWS | RESULT |
+|---------------+-------------+----------------+--------|
+| actor         | 200         | 200            | MATCH  |
+| address       | 603         | 603            | MATCH  |
+| category      | 16          | 16             | MATCH  |
+| city          | 600         | 600            | MATCH  |
+| country       | 109         | 109            | MATCH  |
+| customer      | 599         | 599            | MATCH  |
+| film          | 1000        | 1000           | MATCH  |
+| film_actor    | 5462        | 5462           | MATCH  |
+| film_category | 1000        | 1000           | MATCH  |
+| film_text     | 1000        | 1000           | MATCH  |
+| inventory     | 4581        | 4581           | MATCH  |
+| language      | 6           | 6              | MATCH  |
+| payment       | 16044       | 16044          | MATCH  |
+| rental        | 16044       | 16044          | MATCH  |
+| staff         | 2           | 2              | MATCH  |
+| store         | 2           | 2              | MATCH  |
++-------------------------------------------------------+
+SELECT check_name, source_value, snowflake_value, IFF(source_value = snowflake_value, 'MATCH', 'DIFF') AS result FROM (
+  SELECT 'payment SUM(amount)' AS check_name,                 67406.56 AS source_value,  (SELECT SUM(amount) FROM payment) AS snowflake_value UNION ALL
+  SELECT 'payment rental_id IS NULL',                         0,                         (SELECT COUNT_IF(rental_id IS NULL) FROM payment) UNION ALL
+  SELECT 'rental return_date IS NULL',                        183,                       (SELECT COUNT_IF(return_date IS NULL) FROM rental) UNION ALL
+  SELECT 'rental MAX(rental_id)',                             16049,                     (SELECT MAX(rental_id) FROM rental) UNION ALL
+  SELECT 'film SUM(length)',                                  115272,                    (SELECT SUM(length) FROM film) UNION ALL
+  SELECT 'film SUM(rental_rate)',                             2980.00,                   (SELECT SUM(rental_rate) FROM film) UNION ALL
+  SELECT 'film SUM(replacement_cost)',                        19984.00,                  (SELECT SUM(replacement_cost) FROM film) UNION ALL
+  SELECT 'film special_features IS NOT NULL',                 1000,                      (SELECT COUNT_IF(special_features IS NOT NULL) FROM film) UNION ALL
+  SELECT 'film rating = PG-13',                               223,                       (SELECT COUNT_IF(rating = 'PG-13') FROM film) UNION ALL
+  SELECT 'customer active (BOOLEAN TRUE)',                    584,                       (SELECT COUNT_IF(active) FROM customer) UNION ALL
+  SELECT 'staff 1 LENGTH(picture) bytes',                     36365,                     (SELECT LENGTH(picture) FROM staff WHERE staff_id = 1) UNION ALL
+  SELECT 'city SUM(LENGTH(city)) characters',                 5090,                      (SELECT SUM(LENGTH(city)) FROM city) UNION ALL
+  SELECT 'address address2 IS NULL',                          4,                         (SELECT COUNT_IF(address2 IS NULL) FROM address) UNION ALL
+  SELECT 'address address2 = empty string',                   599,                       (SELECT COUNT_IF(address2 = '') FROM address) UNION ALL
+  SELECT 'address location IS NOT NULL',                      603,                       (SELECT COUNT_IF(location IS NOT NULL) FROM address) UNION ALL
+  SELECT 'address location outside lon/lat range',            6,                         (SELECT COUNT_IF(ST_X(location) NOT BETWEEN -180 AND 180 OR ST_Y(location) NOT BETWEEN -90 AND 90) FROM address)
+);
++----------------------------------------------------------------------------------+
+| CHECK_NAME                             | SOURCE_VALUE | SNOWFLAKE_VALUE | RESULT |
+|----------------------------------------+--------------+-----------------+--------|
+| payment SUM(amount)                    | 67406.56     | 67406.56        | MATCH  |
+| payment rental_id IS NULL              | 0.00         | 0.00            | MATCH  |
+| rental return_date IS NULL             | 183.00       | 183.00          | MATCH  |
+| rental MAX(rental_id)                  | 16049.00     | 16049.00        | MATCH  |
+| film SUM(length)                       | 115272.00    | 115272.00       | MATCH  |
+| film SUM(rental_rate)                  | 2980.00      | 2980.00         | MATCH  |
+| film SUM(replacement_cost)             | 19984.00     | 19984.00        | MATCH  |
+| film special_features IS NOT NULL      | 1000.00      | 1000.00         | MATCH  |
+| film rating = PG-13                    | 223.00       | 223.00          | MATCH  |
+| customer active (BOOLEAN TRUE)         | 584.00       | 584.00          | MATCH  |
+| staff 1 LENGTH(picture) bytes          | 36365.00     | 36365.00        | MATCH  |
+| city SUM(LENGTH(city)) characters      | 5090.00      | 5090.00         | MATCH  |
+| address address2 IS NULL               | 4.00         | 4.00            | MATCH  |
+| address address2 = empty string        | 599.00       | 599.00          | MATCH  |
+| address location IS NOT NULL           | 603.00       | 603.00          | MATCH  |
+| address location outside lon/lat range | 6.00         | 6.00            | MATCH  |
++----------------------------------------------------------------------------------+
+SELECT 'staff 1 MD5(HEX_ENCODE(picture))' AS check_name, '1f9645743e1ddae309c4bb38ebd6ba9c' AS source_value,
+       MD5(HEX_ENCODE(picture)) AS snowflake_value, IFF(source_value = snowflake_value, 'MATCH', 'DIFF') AS result
+FROM staff WHERE staff_id = 1;
++-----------------------------------------------------------------------------------------------------------------+
+| CHECK_NAME                       | SOURCE_VALUE                     | SNOWFLAKE_VALUE                  | RESULT |
+|----------------------------------+----------------------------------+----------------------------------+--------|
+| staff 1 MD5(HEX_ENCODE(picture)) | 1f9645743e1ddae309c4bb38ebd6ba9c | 1f9645743e1ddae309c4bb38ebd6ba9c | MATCH  |
++-----------------------------------------------------------------------------------------------------------------+
+SELECT 'actor' AS tbl, COUNT(*) - COUNT(DISTINCT actor_id) AS duplicate_keys FROM actor UNION ALL
+SELECT 'address', COUNT(*) - COUNT(DISTINCT address_id) FROM address UNION ALL
+SELECT 'category', COUNT(*) - COUNT(DISTINCT category_id) FROM category UNION ALL
+SELECT 'city', COUNT(*) - COUNT(DISTINCT city_id) FROM city UNION ALL
+SELECT 'country', COUNT(*) - COUNT(DISTINCT country_id) FROM country UNION ALL
+SELECT 'customer', COUNT(*) - COUNT(DISTINCT customer_id) FROM customer UNION ALL
+SELECT 'film', COUNT(*) - COUNT(DISTINCT film_id) FROM film UNION ALL
+SELECT 'film_actor', COUNT(*) - COUNT(DISTINCT actor_id, film_id) FROM film_actor UNION ALL
+SELECT 'film_category', COUNT(*) - COUNT(DISTINCT film_id, category_id) FROM film_category UNION ALL
+SELECT 'film_text', COUNT(*) - COUNT(DISTINCT film_id) FROM film_text UNION ALL
+SELECT 'inventory', COUNT(*) - COUNT(DISTINCT inventory_id) FROM inventory UNION ALL
+SELECT 'language', COUNT(*) - COUNT(DISTINCT language_id) FROM language UNION ALL
+SELECT 'payment', COUNT(*) - COUNT(DISTINCT payment_id) FROM payment UNION ALL
+SELECT 'rental', COUNT(*) - COUNT(DISTINCT rental_id) FROM rental UNION ALL
+SELECT 'staff', COUNT(*) - COUNT(DISTINCT staff_id) FROM staff UNION ALL
+SELECT 'store', COUNT(*) - COUNT(DISTINCT store_id) FROM store;
++--------------------------------+
+| TBL           | DUPLICATE_KEYS |
+|---------------+----------------|
+| actor         | 0              |
+| address       | 0              |
+| category      | 0              |
+| city          | 0              |
+| country       | 0              |
+| customer      | 0              |
+| film          | 0              |
+| film_actor    | 0              |
+| film_category | 0              |
+| film_text     | 0              |
+| inventory     | 0              |
+| language      | 0              |
+| payment       | 0              |
+| rental        | 0              |
+| staff         | 0              |
+| store         | 0              |
++--------------------------------+
+SELECT 'address.city_id -> city' AS fk, COUNT(*) AS orphans FROM address c WHERE NOT EXISTS (SELECT 1 FROM city p WHERE p.city_id = c.city_id) UNION ALL
+SELECT 'city.country_id -> country', COUNT(*) FROM city c WHERE NOT EXISTS (SELECT 1 FROM country p WHERE p.country_id = c.country_id) UNION ALL
+SELECT 'customer.address_id -> address', COUNT(*) FROM customer c WHERE NOT EXISTS (SELECT 1 FROM address p WHERE p.address_id = c.address_id) UNION ALL
+SELECT 'customer.store_id -> store', COUNT(*) FROM customer c WHERE NOT EXISTS (SELECT 1 FROM store p WHERE p.store_id = c.store_id) UNION ALL
+SELECT 'film.language_id -> language', COUNT(*) FROM film c WHERE NOT EXISTS (SELECT 1 FROM language p WHERE p.language_id = c.language_id) UNION ALL
+SELECT 'film.original_language_id -> language', COUNT(*) FROM film c WHERE c.original_language_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM language p WHERE p.language_id = c.original_language_id) UNION ALL
+SELECT 'film_actor.actor_id -> actor', COUNT(*) FROM film_actor c WHERE NOT EXISTS (SELECT 1 FROM actor p WHERE p.actor_id = c.actor_id) UNION ALL
+SELECT 'film_actor.film_id -> film', COUNT(*) FROM film_actor c WHERE NOT EXISTS (SELECT 1 FROM film p WHERE p.film_id = c.film_id) UNION ALL
+SELECT 'film_category.film_id -> film', COUNT(*) FROM film_category c WHERE NOT EXISTS (SELECT 1 FROM film p WHERE p.film_id = c.film_id) UNION ALL
+SELECT 'film_category.category_id -> category', COUNT(*) FROM film_category c WHERE NOT EXISTS (SELECT 1 FROM category p WHERE p.category_id = c.category_id) UNION ALL
+SELECT 'inventory.film_id -> film', COUNT(*) FROM inventory c WHERE NOT EXISTS (SELECT 1 FROM film p WHERE p.film_id = c.film_id) UNION ALL
+SELECT 'inventory.store_id -> store', COUNT(*) FROM inventory c WHERE NOT EXISTS (SELECT 1 FROM store p WHERE p.store_id = c.store_id) UNION ALL
+SELECT 'payment.customer_id -> customer', COUNT(*) FROM payment c WHERE NOT EXISTS (SELECT 1 FROM customer p WHERE p.customer_id = c.customer_id) UNION ALL
+SELECT 'payment.staff_id -> staff', COUNT(*) FROM payment c WHERE NOT EXISTS (SELECT 1 FROM staff p WHERE p.staff_id = c.staff_id) UNION ALL
+SELECT 'payment.rental_id -> rental', COUNT(*) FROM payment c WHERE c.rental_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM rental p WHERE p.rental_id = c.rental_id) UNION ALL
+SELECT 'rental.customer_id -> customer', COUNT(*) FROM rental c WHERE NOT EXISTS (SELECT 1 FROM customer p WHERE p.customer_id = c.customer_id) UNION ALL
+SELECT 'rental.inventory_id -> inventory', COUNT(*) FROM rental c WHERE NOT EXISTS (SELECT 1 FROM inventory p WHERE p.inventory_id = c.inventory_id) UNION ALL
+SELECT 'rental.staff_id -> staff', COUNT(*) FROM rental c WHERE NOT EXISTS (SELECT 1 FROM staff p WHERE p.staff_id = c.staff_id) UNION ALL
+SELECT 'staff.address_id -> address', COUNT(*) FROM staff c WHERE NOT EXISTS (SELECT 1 FROM address p WHERE p.address_id = c.address_id) UNION ALL
+SELECT 'staff.store_id -> store', COUNT(*) FROM staff c WHERE NOT EXISTS (SELECT 1 FROM store p WHERE p.store_id = c.store_id) UNION ALL
+SELECT 'store.address_id -> address', COUNT(*) FROM store c WHERE NOT EXISTS (SELECT 1 FROM address p WHERE p.address_id = c.address_id) UNION ALL
+SELECT 'store.manager_staff_id -> staff', COUNT(*) FROM store c WHERE NOT EXISTS (SELECT 1 FROM staff p WHERE p.staff_id = c.staff_id);
+╭─ Error ──────────────────────────────────────────────────────────────────────╮
+│ 000904 (42000): 01c7f932-0303-aed4-001f-81630006192e: SQL compilation error: │
+│ error line 22 at position 123                                                │
+│ invalid identifier 'C.STAFF_ID'                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
+| status                           |
+|----------------------------------|
+| Statement executed successfully. |
+| FK                                    | ORPHANS |
+|---------------------------------------+---------|
+| address.city_id -> city               | 0       |
+| city.country_id -> country            | 0       |
+| customer.address_id -> address        | 0       |
+| customer.store_id -> store            | 0       |
+| film.language_id -> language          | 0       |
+| film.original_language_id -> language | 0       |
+| film_actor.actor_id -> actor          | 0       |
+| film_actor.film_id -> film            | 0       |
+| film_category.film_id -> film         | 0       |
+| film_category.category_id -> category | 0       |
+| inventory.film_id -> film             | 0       |
+| inventory.store_id -> store           | 0       |
+| payment.customer_id -> customer       | 0       |
+| payment.staff_id -> staff             | 0       |
+| payment.rental_id -> rental           | 0       |
+| rental.customer_id -> customer        | 0       |
+| rental.inventory_id -> inventory      | 0       |
+| rental.staff_id -> staff              | 0       |
+| staff.address_id -> address           | 0       |
+| staff.store_id -> store               | 0       |
+| store.address_id -> address           | 0       |
+| store.manager_staff_id -> staff       | 0       |
+| RATING | FILMS |
+|--------+-------|
+| G      | 178   |
+| NC-17  | 210   |
+| PG     | 194   |
+| PG-13  | 223   |
+| R      | 195   |
+| SPECIAL_FEATURE   | FILMS |
+|-------------------+-------|
+| Behind the Scenes | 538   |
+| Commentaries      | 539   |
+| Deleted Scenes    | 503   |
+| Trailers          | 535   |
+| ADDRESS_ID | LOCATION_WKT                   |
+|------------+--------------------------------|
+| 1          | POINT(-112.8185647 49.6999986) |
+| 63         | POINT(766456911 13.5639657)    |

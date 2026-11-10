@@ -1,0 +1,17 @@
+1. A and B differ because they assign each payment to a store by different keys. A uses customer.store_id, which is the customer's home store, through payment.customer_id. B uses FACT_PAYMENT.store_key, which maps to DIM_STORE.store_id. The text does not say how store_key was loaded. Likely sources are the processing staff's store (payment.staff_id to staff.store_id) or the store holding the rented inventory (rental to inventory.store_id). I can't tell which from the text.
+
+2. Neither is wrong on this evidence. A answers "revenue by the store the paying customer is registered with". B answers "revenue by the store that took the payment", under whichever definition the load used. They are two different questions that both get called "revenue by store". The decision belongs to the business, and the star's load logic should be documented.
+
+3. The totals are identical. Payments: 8747+7297 = 16,044 and 7923+8121 = 16,044. Revenue: 36997.53+30409.03 = 67,406.56 and 33679.79+33726.77 = 67,406.56. So no rows were lost, duplicated or filtered by either join. Only the allocation between stores differs. The fact table has the same grain and total as payment, and this is a definition difference, not a load defect.
+
+4. This query shows each payment's store under all three definitions:
+SELECT c.store_id AS customer_store, s.store_id AS staff_store, i.store_id AS inventory_store, COUNT(*) AS payments, SUM(p.amount) AS revenue
+FROM SAKILA.OLTP.payment p
+JOIN SAKILA.OLTP.customer c ON c.customer_id = p.customer_id
+JOIN SAKILA.OLTP.staff s ON s.staff_id = p.staff_id
+LEFT JOIN SAKILA.OLTP.rental r ON r.rental_id = p.rental_id
+LEFT JOIN SAKILA.OLTP.inventory i ON i.inventory_id = r.inventory_id
+GROUP BY 1,2,3 ORDER BY 1,2,3
+Check: payments must sum to 16,044 and revenue to 67,406.56. Grouping by customer_store must reproduce A. Whichever of staff_store or inventory_store reproduces B (7923 / 33679.79 and 8121 / 33726.77) is the star's definition.
+
+5. If the star had used the customer's store, B would equal A: store 1 = 8747 / 36997.53 and store 2 = 7297 / 30409.03. In the other direction, if A had used B's definition, A would equal B: 7923 / 33679.79 and 8121 / 33726.77. Either way the totals stay at 16,044 and 67,406.56.

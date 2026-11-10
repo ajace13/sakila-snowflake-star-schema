@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install duckdb pandas pytest ruff
+      - name: Download the Sakila dump (to test the exporter end to end)
+        # If the download fails, the end-to-end exporter test is skipped; everything else still runs.
+        run: |
+          if curl -sSfL https://downloads.mysql.com/docs/sakila-db.tar.gz -o sakila-db.tar.gz; then
+            tar -xzf sakila-db.tar.gz
+          else
+            echo "::warning::Sakila dump download failed; the full-dump exporter test will be skipped"
+          fi
+      - name: Lint
+        run: ruff check .
+      - name: Test
+        run: pytest -q
+      - name: Build the star locally and reconcile
+        run: python demo/build_star_duckdb.py

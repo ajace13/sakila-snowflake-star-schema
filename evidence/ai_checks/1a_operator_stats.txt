@@ -1,0 +1,40 @@
+OPERATOR_ID=0  STEP_ID=1  TYPE=Result  PARENTS=None
+  statistics: {"input_rows": 1}
+  time_breakdown: {"overall_percentage": 0.0}
+  attributes: {"expressions": ["SUM(P.AMOUNT)", "COUNT(*)", "COUNT(DISTINCT C.CUSTOMER_ID)", "ROUND((SUM(P.AMOUNT)) / (COUNT(P.AMOUNT)), 2)"]}
+OPERATOR_ID=1  STEP_ID=1  TYPE=Aggregate  PARENTS=[
+  0
+]
+  statistics: {"input_rows": 15543, "output_rows": 1}
+  time_breakdown: {"overall_percentage": 0.0}
+  attributes: {"functions": ["SUM(P.AMOUNT)", "COUNT(*)", "COUNT(DISTINCT C.CUSTOMER_ID)", "COUNT(P.AMOUNT)"]}
+OPERATOR_ID=2  STEP_ID=1  TYPE=Join  PARENTS=[
+  1
+]
+  statistics: {"input_rows": 16142, "output_rows": 15543}
+  time_breakdown: {"overall_percentage": 0.0}
+  attributes: {"equality_join_condition": "(P.CUSTOMER_KEY = C.CUSTOMER_KEY)", "join_type": "INNER"}
+OPERATOR_ID=3  STEP_ID=1  TYPE=Filter  PARENTS=[
+  2
+]
+  statistics: {"input_rows": 15543, "output_rows": 15543}
+  time_breakdown: {"overall_percentage": 0.0}
+  attributes: {"filter_condition": "(P.PAYMENT_DATE_KEY >= 20050527) AND (P.PAYMENT_DATE_KEY <= 20050825)"}
+OPERATOR_ID=4  STEP_ID=1  TYPE=TableScan  PARENTS=[
+  3
+]
+  statistics: {"io": {"bytes_scanned": 131088, "percentage_scanned_from_cache": 0, "scan_progress": 1}, "output_rows": 15543, "pruning": {"partitions_scanned": 1, "partitions_total": 1}}
+  time_breakdown: {"overall_percentage": 0.25, "remote_disk_io": 0.25}
+  attributes: {"columns": ["PAYMENT_DATE_KEY", "CUSTOMER_KEY", "AMOUNT"], "table_alias": "P", "table_name": "SAKILA.DW.FACT_PAYMENT"}
+OPERATOR_ID=5  STEP_ID=1  TYPE=JoinFilter  PARENTS=[
+  2
+]
+  statistics: {"input_rows": 599, "output_rows": 599}
+  time_breakdown: {"overall_percentage": 0.0}
+  attributes: {"join_id": "2"}
+OPERATOR_ID=6  STEP_ID=1  TYPE=TableScan  PARENTS=[
+  5
+]
+  statistics: {"io": {"bytes_scanned": 65536, "percentage_scanned_from_cache": 0, "scan_progress": 1}, "output_rows": 599, "pruning": {"partitions_scanned": 1, "partitions_total": 1}}
+  time_breakdown: {"overall_percentage": 0.25, "remote_disk_io": 0.25}
+  attributes: {"columns": ["CUSTOMER_KEY", "CUSTOMER_ID"], "table_alias": "C", "table_name": "SAKILA.DW.DIM_CUSTOMER"}

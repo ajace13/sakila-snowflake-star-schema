@@ -1,0 +1,124 @@
+REVIEW OF <project folder>/sql/04_dw_ddl.sql
+Nothing was run. I read 07 and 01_oltp_ddl.sql. I also read 05_dw_load_merge.sql and 06_dw_checks.sql, because the load decides whether the DDL's promises hold. File:line below means 07 unless I name another file. Fixes are described as edits for me to make, not as write statements. All check queries are SELECT text.
+
+=== FACT TABLES ===
+
+**FACT_RENTAL (07:85-103)**
+
+Grain: one row per rental_id. Lines 96 (PRIMARY KEY rental_id) and 103 (the grain COMMENT) set it. 08:122 merges on rental_id, and 04:164 has rental_id as the source PK.
+- Every column fits the grain. The return columns (88, 93, 95) are filled in later by the MERGE (08:123-124), so this is an accumulating-snapshot row, as lines 83-84 say.
+- Weak wording at line 103: "one copy rented by one customer on one date". The source's own uniqueness is (rental_date, inventory_id, customer_id) at full-timestamp precision (04:165). A customer can legitimately rent the same copy twice in one day. Read literally, that sentence would collapse two real rentals. The true grain is rental_id, not that triple.
+- Keys:
+  - rental_id (line 86) is a degenerate dimension. That is correct.
+  - inventory_id (line 87) is labelled "degenerate", but it is the key of a copy entity that has no dimension. film_key and store_key are derived from it (08:117-120). I'd call this wording imprecise, not wrong.
+
+Measures:
+- rental_count (94): additive. It is a constant 1 (08:114), so SUM gives the number of rentals across every dimension.
+- days_out (95): additive over every dimension, but only for returned rentals. It is NULL until return.
+  - It is a DATEDIFF('day') calendar-boundary count (08:115), so a 23-hour rental can show 1 and a 2-hour rental can show 0. Do not compare it to film.rental_duration as an overdue test.
+  - It is restated when a copy comes back, so a report run earlier will not match one run later.
+  - Averages must use SUM(days_out)/COUNT(days_out). The comment at line 95 already says this.
+- DIM_FILM.rental_rate and replacement_cost (72) are dimension attributes, not measures. Summing them through a fact join is wrong.
+
+Joins in the load that could multiply rows (08:109-122). Each is a potential duplicate-key insert, because PK and UNIQUE are not enforced:
+- DIM_CUSTOMER range join (08:118) and DIM_FILM range join (08:119). They multiply if any version intervals overlap.
+- inventory join (08:117) and the DIM_STORE / DIM_STAFF joins on natural key (08:120-121). They multiply if the source or dimension holds duplicate keys. Both are unenforced.
+
+Check, to run before the MERGE:
+`SELECT COUNT(*) - COUNT(DISTINCT rental_id) FROM (<the 08:110-121 SELECT>);`
+It must return 0 and the COUNT(*) must equal the OLTP rental count (326... see the project count for Sakila).
+After the load, 09:76 does the same for the fact table and 09:104-105 check the as-of keys.
+
+Nothing prevents a duplicate or null return_ts / return_date_key mismatch. return_date_key = -1 and return_ts IS NULL (88, 93) are two copies of one fact and nothing ties them together. Check: `SELECT COUNT(*) FROM FACT_RENTAL WHERE (return_ts IS NULL) <> (return_date_key = -1);` (09:14 covers the count only, not the row-level agreement.)
+
+**FACT_PAYMENT (07:108-124)**
+
+Grain: one row per payment_id. Lines 118 (PRIMARY KEY) and 124 (COMMENT) set it. The source PK is at 04:178.
+- The words "against one rental" (line 124) do not hold for every source row. rental_id is NOT NULL here (110), but payment.rental_id is nullable in the source (04:174).
+  - The load LEFT JOINs rental (08:137), so a payment with a NULL rental_id gets NULL film_key and store_key.
+  - That aborts the whole MERGE on NOT NULL. This is loud, not silent.
+  - I cannot tell from the files whether this data has such rows. My recollection is that reference Sakila has a few. I am not sure.
+  - The model cannot represent a payment with no rental. Decide whether to allow a NULL or an "unknown rental" member, and document it.
+- Nothing makes rental_id unique within this fact (110). The comment says it is 1:1 "in this data", checked in 09. That is a data property, not a schema guarantee. 09:78 checks it.
+- Every column fits the grain. film_key is resolved from the rental time (line 113) and customer_key from the payment time (line 112), which is deliberate and documented.
+
+Measures:
+- amount (117): additive across every dimension, including time, because it is a flow of money.
+  - NUMBER(5,2) allows negatives, so it silently permits refunds.
+  - It does not sum with rental measures.
+- There is no other measure.
+
+Joins in the load (08:133-142) that could multiply rows:
+- rental and inventory (08:137-138, source PKs unenforced).
+- The customer range join (08:139) and the film range join (08:140).
+- Natural-key joins to store and staff (08:141-142).
+
+Check, to run before the MERGE:
+`SELECT COUNT(*) - COUNT(DISTINCT payment_id) FROM (<the 08:134-142 SELECT>);`
+It must return 0. Also check:
+`SELECT COUNT(*) FROM SAKILA.OLTP.payment WHERE rental_id IS NULL;`
+It must return 0, or line 110 is wrong.
+
+Joining the two facts to each other:
+- On rental_id it is 1:1 in this data (09:81), but only by observation. Any rental with two payments multiplies FACT_RENTAL measures (rental_count, days_out).
+- Through a shared dimension (for example both on film_key) with no prior aggregation, it multiplies in both directions. Every rental for a film pairs with every payment for that film, so SUM(amount) and SUM(rental_count) are both inflated. This is the classic chasm trap.
+- Check, for any query that joins them: `SELECT SUM(amount) FROM FACT_PAYMENT` must equal the SUM(amount) over the joined result. Compare the totals in 09:9 and 09:11 against the joined query's output.
+
+=== DIMENSIONS ===
+
+- **DIM_CUSTOMER (50-63)**
+  - Key: surrogate customer_key (line 51); natural key customer_id repeats once per version (52).
+  - Not one row per entity. It is one row per version (the table comment at 63 says so). COUNT(*) overcounts customers; use COUNT(DISTINCT customer_id).
+  - SCD Type 2 is justified for address, city, country and store_id (lines 48-49).
+  - It is over-tracked: names, email, phone, create_date and active all start a new version (line 63, "every attribute"). That is version bloat, but it is not a correctness defect.
+- **DIM_FILM (67-79)**
+  - Key: surrogate film_key (68); natural key film_id repeats (69). One row per version.
+  - Type 2 is a stated choice for rental_rate, replacement_cost, rental_duration and rating (65-66). The caveat at line 66 is real: OLTP holds only today's value, so true history starts at the first load, not before.
+  - `category` is a single column (70), but film_category is many-to-many in the source (04:136 PK film_id, category_id). The load joins it directly (08:90), so a film with two categories becomes two source rows and two first versions. 09:108 checks for this.
+- **DIM_STORE (27-34)**
+  - Key: store_key; natural key store_id, UNIQUE (33). One row per store. Type 1 by choice (25-26).
+  - A manager change overwrites history. That is a documented, acceptable choice, but it restates old facts.
+- **DIM_STAFF (39-46)**
+  - Key: staff_key; natural key staff_id, UNIQUE (45). One row per staff member. Type 1 by choice (36-38).
+  - home_store_id is overwritten on reassignment, and that is documented.
+- **DIM_DATE (17-23)**
+  - Key: date_key = yyyymmdd (18). One row per calendar day, plus the -1 sentinel, which is not a day. The count of 9,496 days is correct (26 years, 6 leap years).
+  - Type 0; no SCD needed.
+  - The -1 row has NULL in every attribute (08:20). Reports by return month or year show a blank group, not a label like "Not returned".
+
+=== LOWER-SEVERITY DEFECTS AND RISKS ===
+- Type 2 as-of time (08:9, 08:78, 08:103):
+  - The new version's valid_from is the load time, not the time the change happened. Facts that occurred between the real change and the next load are attributed to the old version.
+  - etl_as_of uses CURRENT_TIMESTAMP in the session time zone. Source timestamps are zone-less wall-clock values. Running the load from sessions with different zones shifts valid_from by hours.
+  - Two changes within one second give a zero-width interval and a duplicate (customer_id, valid_from) (07:62, 07:78).
+  - 08:4-5 invites replaying an earlier date. That can produce valid_to earlier than valid_from, and nothing rejects it.
+- Row-hash NULL handling is correct. The load uses TO_JSON(ARRAY_CONSTRUCT(...)), so NULL and '' hash differently, and 09:111 tests it. I found no defect here.
+- Snowflake keys:
+  - PK, UNIQUE and FK are declared but not enforced; NOT NULL is. There is no CHECK constraint, so "always 1" (94) and "valid_to > valid_from" cannot be declared.
+  - AUTOINCREMENT values can skip. Do not treat key order or gaps as meaningful.
+  - I am not certain whether Snowflake accepts NOT NULL before AUTOINCREMENT in the column definition. The note at 07:126 suggests the file was run, so it probably does.
+  - The data types SMALLINT and TINYINT are all NUMBER(38,0) in Snowflake. They constrain nothing, so there is no overflow risk from them.
+- FACT_PAYMENT has no rental_date_key and no inventory_id (108-117). "Revenue by rental month" or "by copy" needs a join to FACT_RENTAL, which line 110 tells analysts not to do. The model pushes people toward the join it forbids.
+- The comment at line 106-107 (8,078 of 16,044 payments differ in customer or staff from the rental) is not checkable from these files. I did not verify it.
+- I did not find a defect in: the surrogate-key vs natural-key split on the four Type 1/2 dimensions, the -1 date member's presence in the FK design, or the amount and rental_count measure types.
+
+=== FINDINGS (most important first) ===
+
+1. **Overlapping or duplicate Type 2 versions would double-count, and nothing in the DDL stops them.**
+   - Where: UNIQUE (customer_id, valid_from) at 07:62 and UNIQUE (film_id, valid_from) at 07:78 are the only guards. They are not enforced, and they do not prevent two current rows or overlapping intervals (60, 76).
+   - Effect: both facts pick their version with a range LEFT JOIN (08:118-119, 08:139-140). An overlap returns two source rows for one rental_id or payment_id. The MERGE's NOT MATCHED branch inserts both silently, because the PKs at 07:96 and 07:118 are not enforced. SUM(amount) and SUM(rental_count) are then inflated.
+   - Fix: make the load gate on 09 section 5 before the fact MERGE. Add a dedup guard to the fact source SELECTs, for example `QUALIFY ROW_NUMBER() OVER (PARTITION BY rental_id ORDER BY valid_from DESC) = 1`.
+   - Evidence the checks exist: 09:88-99 are post-hoc and only run if someone runs them.
+   - Confidence: high that nothing is enforced. I did not run anything to see whether any overlap exists today.
+
+2. **The two facts do not share a customer key, and joining them multiplies rows.**
+   - Where: FACT_RENTAL.customer_key is the version at rental_ts (07:89). FACT_PAYMENT.customer_key is the version at payment_ts (07:112). A customer who changes between rental and payment has a different customer_key in each fact.
+   - Effect: a drill-across on customer_key silently drops or mismatches rows. Joining on customer_id instead multiplies each fact by the number of versions. Joining both facts to a shared dimension without aggregating each first inflates both measures (see "Joining the two facts" above).
+   - Fix: aggregate each fact separately, then combine on a conformed attribute such as customer_id or country. Add rental_date_key to FACT_PAYMENT (07:108-117) so nobody needs the rental_id join.
+   - Confidence: high on the mechanism. The data-level impact depends on how many customers have more than one version.
+
+3. **`CREATE TABLE IF NOT EXISTS` makes every fix to this file a silent no-op on existing tables.**
+   - Where: 07:5-7 and every CREATE in the file. The only way to apply a changed definition, per the header, is to recreate the schema. That destroys Type 2 history that OLTP no longer has.
+   - Effect: editing the DDL for findings 1 and 2, or for the nullable rental_id mismatch (07:110 vs 04:174), changes nothing in Snowflake. The file and the live tables drift apart with no error.
+   - Fix: add a schema-drift check, for example comparing SAKILA.INFORMATION_SCHEMA.COLUMNS against the expected columns, and plan an explicit, reviewed migration that preserves the Type 2 dimensions. I am not writing that migration.
+   - Confidence: high that IF NOT EXISTS skips an existing table. I am not sure of the retention settings on this account for recovering a dropped schema.

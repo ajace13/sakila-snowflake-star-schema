@@ -1,0 +1,14 @@
+UNFILTERED (full date range)
+  KPIs: {'Revenue': '$67,406.56', 'Payments': '16,044', 'Paying customers': '599', 'Average payment': '$4.20'}
+  Check expander: All 7 comparisons match for payments dated 2005-05-24 to 2006-02-14.
+FILTERED (payments 2005-06-01 to 2005-07-15)
+  KPIs: {'Revenue': '$24,103.36', 'Payments': '5,764', 'Paying customers': '598', 'Average payment': '$4.18'}
+  Check expander: All 7 comparisons match for payments dated 2005-06-01 to 2005-07-15.
+  the filter changed all four KPIs: ['Revenue', 'Payments', 'Paying customers', 'Average payment']
+
+statements sent to Snowflake: 17 (both runs)
+  read SAKILA.DW only (what the page shows): 9
+  read SAKILA.OLTP (the Check expander only): 8
+  neither: 0
+
+OK: the page reads only the star; only the Check expander reads the normalized copy; all comparisons match.

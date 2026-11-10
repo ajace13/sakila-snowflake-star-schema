@@ -1,0 +1,17 @@
+### E1 rows in/out of the date range (claim 3: 501 rows discarded)
+| TABLE_ROWS | ROWS_IN_RANGE | ROWS_OUTSIDE |
+| 16044      | 15543         | 501          |
+### E2 DIM_CUSTOMER versions (claim 4: unknown whether several versions per customer_id)
+| ROWS_ | DISTINCT_CUSTOMER_ID | DISTINCT_CUSTOMER_KEY |
+| 599   | 599                  | 599                   |
+### E3 join does not multiply or drop (claim 4): fact rows in range vs rows after the join
+| FACT_ROWS_IN_RANGE | ROWS_AFTER_JOIN |
+| 15543              | 15543           |
+### E4 micro-partitions of the two tables (claim 3: 1 of 1)
+| FACT_PAYMENT_PARTITIONS | DIM_CUSTOMER_PARTITIONS |
+| 1                       | 1                       |
+### E5 where the 973 ms went (claim 5)
+### E6 bytes scanned = sum of the two scans (claim 1)
+131088 + 65536 = 196624
+| TOTAL_ELAPSED_TIME | COMPILATION_TIME | EXECUTION_TIME | QUEUED_PROVISIONING_TIME | QUEUED_REPAIR_TIME | QUEUED_OVERLOAD_TIME | TRANSACTION_BLOCKED_TIME | BYTES_SCANNED | PCT_FROM_CACHE | WAREHOUSE_SIZE |
+| 973                | 463              | 397            | 113                      | 0                  | 0                    | 0                        | 196624        | 0.0            | X-Small        |

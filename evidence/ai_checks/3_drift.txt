@@ -1,0 +1,9 @@
+table          cols in 07 live cols  names/order  NOT NULL  column comments  table comment
+DIM_CUSTOMER           19        19  same         same      same             same
+DIM_DATE               10        10  same         same      same             same
+DIM_FILM               17        17  same         same      same             same
+DIM_STAFF               8         8  same         same      same             same
+DIM_STORE               9         9  same         same      same             same
+FACT_PAYMENT            9         9  same         same      same             same
+FACT_RENTAL            12        12  same         same      same             same
+tables in 07: 7 | live tables in DW: 7 | differences found: 0

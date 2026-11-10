@@ -1,0 +1,18 @@
+table,check,source_value
+payment,SUM(amount),67406.56
+payment,COUNT(*) WHERE rental_id IS NULL,0
+rental,COUNT(*) WHERE return_date IS NULL,183
+rental,MAX(rental_id),16049
+film,SUM(length),115272
+film,SUM(rental_rate),2980.00
+film,SUM(replacement_cost),19984.00
+film,COUNT(*) WHERE special_features IS NOT NULL,1000
+film,COUNT(*) WHERE rating = 'PG-13',223
+customer,COUNT(*) WHERE active,584
+staff,LENGTH(picture) WHERE staff_id = 1,36365
+city,SUM(LENGTH(city)),5090
+staff,MD5(HEX_ENCODE(picture)) WHERE staff_id = 1,1f9645743e1ddae309c4bb38ebd6ba9c
+address,COUNT(*) WHERE address2 IS NULL,4
+address,COUNT(*) WHERE address2 = '',599
+address,COUNT(*) WHERE location IS NOT NULL,603
+address,COUNT(*) WHERE location is outside lon/lat range,6

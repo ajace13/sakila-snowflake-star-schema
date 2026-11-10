@@ -1,0 +1,9 @@
+1. Yes, identical. The BETWEEN 20050524 AND 20060214 filter spans the whole data range, so all 16,044 rows pass. This assumes no NULL payment_date_key, which BETWEEN would drop. I can't confirm that from the text. The join is the same in both queries. Expected output: same revenue, 16,044 payments, at most 599 paying customers, same average.
+
+2. BEFORE is about 196,624 bytes (range 190k-200k), matching the earlier run. AFTER should be lower because PAYMENT_DATE_KEY is no longer read. Best guess is about 160,000 (range 131,000-196,624). DIM_CUSTOMER stays at 65,536. The FACT scan should fall from 131,088 by one column's compressed size. That column is a low-cardinality integer, so I expect it to be small, about 20-45 KB. The scan sizes look chunky (65,536 for two DIM columns), so "no change" is possible. I put that at about 20%.
+
+3. BEFORE is 600-1,100 ms, best guess 850. AFTER is 600-1,100 ms, best guess 820. I expect a difference under 50 ms, which is not larger than run-to-run noise of roughly 100-200 ms. Compilation (about 460 ms) and provisioning dominate, and the filter cost about 0 ms in the earlier plan.
+
+4. The Filter operator should be missing from AFTER. It showed 0.0 time before. The Join, Aggregate and Result operators remain, along with both TableScans.
+
+5. BYTES_SCANNED does not depend on cache state, so the byte prediction holds either way. Elapsed time does. A cold local cache adds remote_disk_io, which was 0.25 per scan earlier. A warm cache would cut execution time by a few hundred ms. Whichever query runs second would get warm data. That would bias the comparison unless the order is alternated. The warm-up query probably doesn't touch these tables.
