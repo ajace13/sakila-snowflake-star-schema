@@ -2,12 +2,12 @@
 
 Built with DDL and DML inside Snowflake from the normalized copy `SAKILA.OLTP`, which is left exactly as it was (it is only read; the scripts that change it, `sql/07` and section 3.2 of `sql/08`, roll back).
 
-| Requirement | Where it is met |
+| Design goal | Where it is met |
 |---|---|
-| 1a. A fact table at a grain you can defend, written into the DDL as a COMMENT | `FACT_RENTAL` and `FACT_PAYMENT`; the `GRAIN:` comment on each table in `sql/04_dw_ddl.sql` |
-| 1b. At least two Type 2 SCDs, with a reason | `DIM_CUSTOMER` (address history) and `DIM_FILM` (rental rate) |
-| 1c. Loads written as MERGE, so a re-run does not duplicate | all seven loads in `sql/05_dw_load_merge.sql`; re-run proof below |
-| 1d. The normalized copy stays in place | `SAKILA.OLTP` untouched; `sql/06` checks the star against it |
+| A fact table at a grain you can defend, written into the DDL as a COMMENT | `FACT_RENTAL` and `FACT_PAYMENT`; the `GRAIN:` comment on each table in `sql/04_dw_ddl.sql` |
+| At least two Type 2 SCDs, with a reason | `DIM_CUSTOMER` (address history) and `DIM_FILM` (rental rate) |
+| Loads written as MERGE, so a re-run does not duplicate | all seven loads in `sql/05_dw_load_merge.sql`; re-run proof below |
+| The normalized copy stays in place | `SAKILA.OLTP` untouched; `sql/06` checks the star against it |
 
 ## The model
 ```

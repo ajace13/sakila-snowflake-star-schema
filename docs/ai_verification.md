@@ -14,7 +14,7 @@ Limits of the set-up, stated plainly. The explainers were *instructed* not to us
 
 **Role in effect.** The setup has Claude Code sign in as `CLAUDE_AGENT` with the read-only role `CLAUDE_RO`. Here the `claude` connection's primary role is `CLAUDE_RO`, but the agent user also holds `ACCOUNTADMIN` (granted 2026-10-21) and its secondary roles are ALL, so `ACCOUNTADMIN` and `SYSADMIN` are active in every session (`SELECT CURRENT_AVAILABLE_ROLES(), CURRENT_SECONDARY_ROLES()`). Write access was switched on at my request for the migration, model and business-question work and the `.claude/settings.json` deny list was emptied. `SNOWFLAKE.ACCOUNT_USAGE.QUERY_HISTORY` for the agent user since 2026-10-19 shows 469 statements under `CLAUDE_RO` and 209 under `SYSADMIN`; 120 of the latter changed data (77 MERGE, 16 COPY, 9 CREATE TABLE, 6 UPDATE, 3 ALTER TABLE, 3 INSERT, 2 BEGIN, 2 ROLLBACK, 1 CREATE, 1 PUT): 113 between 20:23 and 21:06 UTC on 2026-10-25 (the migration, model and business-question work) and the last 7 MERGEs at 02:28 UTC on 2026-10-26, a re-run of `sql/05` that changed nothing. The checks in this file are SELECT, SHOW and DESCRIBE statements.
 
-Raw evidence for everything below, including the prompts, is in `evidence/ai_checks/` (one file per step, named by task: `1a_*`, `1b_*`, `2_*`, `3_*`, `4_*`, `5_*`). The prompt log is `docs/prompt_log.md`; the Claude Code tool log is kept private.
+Raw evidence for everything below, including the prompts, is in `evidence/ai_checks/` (one file per step, named by section: `1a_*`, `1b_*`, `2_*`, `3_*`, `4_*`, `5_*`). The prompt log is `docs/prompt_log.md`; the Claude Code tool log is kept private.
 
 ---
 
@@ -407,11 +407,11 @@ claude -p "Write docs/data_dictionary.md for every DW table from INFORMATION_SCH
 
 All three hold, for `CLASSICMODELS.DW`. They say nothing about `SAKILA.DW`.
 
-**You asked for the re-run** (answered in the AI verification questions): see 4b below.
+**I asked for a re-run:** see 4b below.
 
-## 4b. The re-run you asked for: schema named, one write allowed
+## 4b. The re-run: schema named, one write allowed
 
-**Commands** (both in `evidence/ai_checks/4b_command.txt`). They differ from the command in the task in two ways you approved: the schema is named (`SAKILA.DW`, "ignore `CLASSICMODELS.DW`"), and write permission is granted for that one file. Attempt 1 used `--allowedTools "Write(docs/data_dictionary.md)"` and was denied again: that was **my mistake**, since this version only accepts `Edit(path)` rules for files (its stderr says so, in `4b_headless_attempt1_stderr.txt`). Attempt 2 used `--allowedTools "Edit(docs/data_dictionary.md)"` and worked.
+**Commands** (both in `evidence/ai_checks/4b_command.txt`). They differ from the original command in two ways you approved: the schema is named (`SAKILA.DW`, "ignore `CLASSICMODELS.DW`"), and write permission is granted for that one file. Attempt 1 used `--allowedTools "Write(docs/data_dictionary.md)"` and was denied again: that was **my mistake**, since this version only accepts `Edit(path)` rules for files (its stderr says so, in `4b_headless_attempt1_stderr.txt`). Attempt 2 used `--allowedTools "Edit(docs/data_dictionary.md)"` and worked.
 
 **Result.** `docs/data_dictionary.md` now exists (239 lines): the 7 tables of `SAKILA.DW`, 84 columns, 22 constraints, each fact tagged with one of six queries (Q1–Q6) whose SQL is listed once at the end; the run's own printed summary is in `4b_headless_stdout.txt`. This time it documented the right schema. `docs/prompt_log.md` was not touched (its checksum is unchanged); the run asked for permission to log the exchange, which I did not grant, and I wrote the log entry myself. It says what it could not know: `INFORMATION_SCHEMA` gives constraint names but not their columns or targets, so those come from `sql/04` and are marked *(DDL)*; and the types shown are Snowflake's storage types.
 
@@ -470,11 +470,11 @@ Made in the terminal on 2026-10-26. Tick-box answers were recorded as given. Cla
 | 4b: the dictionary re-run (Sakila) | 3 | 3 | 0 |
 | **Y/N cells in all** | **41** | **32** | **9** |
 
-**Accept / reject** (reasons are in the Task 3 table): finding 1 **Accept**, finding 2 **Accept**, finding 3 **Accept**.
+**Accept / reject** (reasons are in the section 3 table): finding 1 **Accept**, finding 2 **Accept**, finding 3 **Accept**.
 
-**My notes, in the cells:** 1b claim 5 (Y, with the caveat that the conclusion held but the noise estimate was too high) and Task 4 claim 1 (Y, "correct for the schema it chose; wrong schema").
+**My notes, in the cells:** 1b claim 5 (Y, with the caveat that the conclusion held but the noise estimate was too high) and section 4 claim 1 (Y, "correct for the schema it chose; wrong schema").
 
-**Judgement calls that were mine: all three approved as they stand.** The KPI query as the "slowest" (397 ms execution time); revenue by store as the Task 2 question; 1b reported as "the change did nothing".
+**Judgement calls that were mine: all three approved as they stand.** The KPI query as the "slowest" (397 ms execution time); revenue by store as the section 2 question; 1b reported as "the change did nothing".
 
 **Edits made at my request:**
 - **The "customer or staff" wording fixed** in `sql/04_dw_ddl.sql` (the comment above `FACT_PAYMENT`), `docs/dimensional_model.md` (line 35) and the notebook's embedded copies of both. It now says the 8,078 payments differ in the staff member only; the customer is always the same. The tables in Snowflake are unaffected (it is a SQL comment). The old wording survives, as evidence, in this file, `docs/prompt_log.md` and `evidence/ai_checks/`.
@@ -484,10 +484,10 @@ Made in the terminal on 2026-10-26. Tick-box answers were recorded as given. Cla
 
 **My candidates for "where Claude was wrong or overconfident"** (also at the end of `docs/prompt_log.md`):
 1. **"Snowflake is read-only"** (entries 2 and 5): said without checking secondary roles; caught when I pushed back and `CURRENT_AVAILABLE_ROLES()` showed ACCOUNTADMIN active.
-2. **"Customer or staff" and "its own customer key"** (entry 12): the dimensional model write-up built an argument on a payment having its own customer key; 0 payments differ in customer, all 8,078 differ in staff (caught in Task 3, aside d).
+2. **"Customer or staff" and "its own customer key"** (entry 12): the dimensional model write-up built an argument on a payment having its own customer key; 0 payments differ in customer, all 8,078 differ in staff (caught in section 3, aside d).
 3. **Recommending to drop the redundant date filter** (entries 21 and 22): said it "forces a scan of `PAYMENT_DATE_KEY`"; the plans were identical, with no Filter operator and the same bytes (caught by the before/after measurement and the operator statistics).
 4. **The headless run documenting the wrong DW and writing nothing** (entry 23): caught by reading its output and the tool log.
-5. **Explainer #2's claim about the store** (added by me; Task 2, claim 4): it said the star's store is "the store that took the payment". Snowflake: the staff (payment-taking) store gives 33,482.50 / 33,924.06, not B's 33,679.79 / 33,726.77; B is the store holding the rented copy. It had just said it couldn't tell, then asserted an answer anyway; caught by the deciding query.
+5. **Explainer #2's claim about the store** (added by me; section 2, claim 4): it said the star's store is "the store that took the payment". Snowflake: the staff (payment-taking) store gives 33,482.50 / 33,924.06, not B's 33,679.79 / 33,726.77; B is the store holding the rented copy. It had just said it couldn't tell, then asserted an answer anyway; caught by the deciding query.
 
 Not picked: the typo in the foreign-key check of `sql/02` (entry 8).
 
