@@ -4,7 +4,7 @@
 | Step | State |
 |---|---|
 | Source read, CSVs written, source counts and control totals computed | Done (`evidence/export_log.txt`) |
-| `sql/01_oltp_ddl.sql`: 16 tables, 22 foreign keys, file format, stage | Done in Snowflake (first run failed on the timestamp default; fixed, see 2c) |
+| `sql/01_oltp_ddl.sql`: 16 tables, 22 foreign keys, file format, stage | Done in Snowflake (first run failed on the timestamp default; fixed, see the data types section below) |
 | 16 CSVs uploaded to `@SAKILA.OLTP.SAKILA_STAGE` | Done (`snow stage copy`, role SYSADMIN) |
 | `sql/02_oltp_load_reconcile.sql`: 16 `COPY INTO`, all with 0 errors | Done (`evidence/load_log.txt`) |
 | Reconciliation: counts, 16 control totals, picture MD5, duplicate keys, 22 foreign keys | All MATCH / 0 |
@@ -12,7 +12,7 @@
 
 `evidence/load_log.txt` ends with the output of the foreign-key and type-conversion checks. The first run of `sql/02` stopped on the foreign-key check because of a typo in its last line (`store.manager_staff_id` was compared with a column `store` does not have). That line is fixed in `sql/02_oltp_load_reconcile.sql`, and the checks were re-run from the fixed file; the error shows in the log between the two runs.
 
-## 2a. Migration code and commands
+## Migration code and commands
 | File | What it does |
 |---|---|
 | `src/export_sakila_csv.py` | Parses every INSERT in `sakila-data.sql` (the file that was imported into Cloud SQL), writes 16 CSVs to `data/csv/`, and writes `data/source_counts.csv` and `data/source_control_totals.csv` |
@@ -40,7 +40,7 @@ python3 -I src/export_sakila_csv.py | tee evidence/export_log.txt
 
 Step 2 was run by you in Snowsight; steps 3 and 4 were run by the agent through the `claude` connection with `--role SYSADMIN`.
 
-## 2b. Row counts, table by table
+## Row counts, table by table
 Source = Sakila v1.5 as loaded into Cloud SQL, counted from the dump. These agree with the counts recorded from the live instance in the Cloud SQL project (film 1,000 · actor 200 · customer 599 · rental 16,044 · payment 16,044 · SUM(amount) 67,406.56). Step 0 repeats them on Cloud SQL itself.
 
 | Table | Source rows | Snowflake rows | Result |
@@ -66,10 +66,10 @@ Source = Sakila v1.5 as loaded into Cloud SQL, counted from the dump. These agre
 Beyond counts, `sql/02_oltp_load_reconcile.sql` also checks 16 control totals (for example `SUM(payment.amount)` = 67,406.56, 584 active customers, the staff picture's MD5), that no table has duplicate keys, and that all 22 foreign keys have zero orphans.
 
 Two things in the source worth knowing:
-- `rental` has 16,044 rows but `MAX(rental_id)` is 16,049: five ids are simply absent in this release. The original requirements quoted 16,049 payments and 67,416.51 from an older Sakila release, which had five payments with a NULL `rental_id` worth 9.95 together (MySQL bug #107158; 67,406.56 + 9.95 = 67,416.51). This release has 16,044 payments, none with a NULL `rental_id`, totalling 67,406.56; nothing was changed to force a match.
+- `rental` has 16,044 rows but `MAX(rental_id)` is 16,049: five ids are simply absent in this release. Older published figures quoted 16,049 payments and 67,416.51 from an older Sakila release, which had five payments with a NULL `rental_id` worth 9.95 together (MySQL bug #107158; 67,406.56 + 9.95 = 67,416.51). This release has 16,044 payments, none with a NULL `rental_id`, totalling 67,406.56; nothing was changed to force a match.
 - `film_text` has no INSERTs in the dump. MySQL filled it through the `ins_film` trigger, so it is loaded as a copy of `film (film_id, title, description)`: 1,000 rows.
 
-## 2c. What the migration did to the data types
+## What the migration did to the data types
 Snowflake has no UNSIGNED, ENUM, SET, YEAR or TINYINT(1), no triggers, and no `ON UPDATE CURRENT_TIMESTAMP`. Each choice below keeps the value and says what was lost.
 
 | MySQL | Snowflake | Why, and what changed |

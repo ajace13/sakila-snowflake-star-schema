@@ -1,6 +1,6 @@
 # Prompt log
 
-**PROMPT — Aidan → Claude Code (the Dashboard task: "Claude explains; Snowflake decides"; Claude Code = CHECKER, subagents = EXPLAINER and REVIEWER)**
+**PROMPT — Aidan → Claude Code (the AI verification step: "Claude explains; Snowflake decides"; Claude Code = CHECKER, subagents = EXPLAINER and REVIEWER)**
 Read CLAUDE.md first. Use the Snowflake connection already configured. Never print, log or write account identifiers, usernames, keys, tokens or connection strings. You (main agent) are the CHECKER; spawn a separate subagent as "CLAUDE (explainer)"; do not fill in the Y/N column, accept/reject decisions or the "where Claude was wrong" note; Tasks 1–5 (explain a plan, explain a difference, review, document, prompt log and tool log); output docs/ai_verification.md ending in a TO DECIDE checklist; show the plan before running anything that changes data or creates objects.
 
 **ANSWER** Read CLAUDE.md; gathered the read-only evidence; showed the plan and asked four questions before changing anything; ran Tasks 1–5; wrote docs/ai_verification.md with the tables and the TO DECIDE checklist (none of the Y/N, accept/reject or "where Claude was wrong" cells filled in).
@@ -21,7 +21,7 @@ Review the fact and SCD2 DDL in sql/04_dw_ddl.sql against sql/01: grain, keys, a
 **ANSWER** Three findings: unenforced Type 2 uniqueness could double-count; the two facts resolve customer_key at different dates and joining them multiplies rows; CREATE TABLE IF NOT EXISTS turns DDL edits into silent no-ops. Its line numbers all checked out; two of its asides were slips ("326" rentals, a hedged guess about NULL rental_id).
 
 ** PROMPT — Aidan → Claude Code (reply to the plan questions)**
-Chose: drop the redundant date filter at full range as the one Task 1b change; run the headless claude -p command as written; redact my login name from docs/prompt_log.md; leave the "customer or staff" wording alone for now.
+Chose: drop the redundant date filter at full range as the one section 1b change; run the headless claude -p command as written; redact my login name from docs/prompt_log.md; leave the "customer or staff" wording alone for now.
 
 **ANSWER** Did all four. The redaction replaced 3 occurrences in docs/prompt_log.md only; the wording in sql/04 and docs/dimensional_model.md was left untouched.
 
@@ -56,6 +56,6 @@ Tick-box answers for every claim, accept for the three findings, approval of the
 **ANSWER** Recorded in docs/ai_verification.md: 41 Y/N cells (32 Y, 9 N), 3 Accept, nothing left open; made the four edits; recorded the five candidates under Decisions.
 
 **PROMPT — Aidan → Claude Code**
-Audit the whole project against the project requirements before submission (read-only on Snowflake, no edits until approved; do not change AI verification verdicts or write Reflection; screenshots are mine); then apply the approved fixes and rebuild the PDF.
+Audit the whole project against the project goals before publishing (read-only on Snowflake, no edits until approved; do not change AI verification verdicts or write Reflection; screenshots are mine); then apply the approved fixes and rebuild the PDF.
 
-**ANSWER** Re-ran the Snowflake counts (16/16 tables, 47,268 rows, 17 control totals, sql/06 57 OK) and checked the app, the dictionary and the Business questions figures against Snowflake. Found the agent session had ACCOUNTADMIN/SYSADMIN active and CLAUDE_RO could not read SAKILA.DW (no schema USAGE). Applied: CLAUDE.md for Sakila, sql/03 grants, AI verification heading and a role note, the stale "Streamlit in Snowflake not run" text, the 16,049/67,416.51 attribution, header comments of sql/07 and sql/08; built submission/ with the PDF.
+**ANSWER** Re-ran the Snowflake counts (16/16 tables, 47,268 rows, 17 control totals, sql/06 57 OK) and checked the app, the dictionary and the Business questions figures against Snowflake. Found the agent session had ACCOUNTADMIN/SYSADMIN active and CLAUDE_RO could not read SAKILA.DW (no schema USAGE). Applied: CLAUDE.md for Sakila, sql/03 grants, AI verification heading and a role note, the stale "Streamlit in Snowflake not run" text, the 16,049/67,416.51 attribution, header comments of sql/07 and sql/08; rebuilt the PDF.

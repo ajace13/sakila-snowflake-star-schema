@@ -35,7 +35,7 @@ with sync_playwright() as p:
     page.wait_for_selector("text=All 7 comparisons match for payments dated 2005-05-24 to 2006-02-14", timeout=120000)
     page.wait_for_timeout(1000)
     unfiltered = [metric(page, i) for i in range(4)]
-    shoot(page, "part4_unfiltered.png")
+    shoot(page, "docs/images/dashboard_unfiltered.png")
     print("unfiltered KPIs:", unfiltered)
 
     spans = page.locator("[data-testid=stDateInput] span[aria-label]")              # year / month / day of the start and the end date

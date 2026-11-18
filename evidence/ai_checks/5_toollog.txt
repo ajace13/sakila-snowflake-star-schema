@@ -12,5 +12,5 @@ sample of the log format (time, tool, first 70 chars of the command; paths maske
 00:40:43  BASH  ls; ls docs 2>/dev/null; tail -5 docs/prompt_log.md 2>/dev/null
 00:40:46  BASH  snow sql -c claude -q "SELECT table_name, table_type, row_count, comment FROM CLASSICMODELS.IN
 00:40:53  BASH  snow sql -c claude -q "SELECT table_name, ordinal_position, column_name, data_type, numeric_pr
-00:40:55  BASH  P=/tmp/claude-1000/-home-<user>-week4-snowflake-claude/746a1b88-3774-49a4-a875-172f9c2663a6/
+00:40:55  BASH  P=/tmp/claude-1000/-home-<user>-<project>/746a1b88-3774-49a4-a875-172f9c2663a6/
 hook configured in .claude/settings.json: [' the Claude Code tool log (kept private)']
